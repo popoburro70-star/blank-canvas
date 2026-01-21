@@ -589,7 +589,16 @@ class BotController:
                 funnel_left = [(0.16, 0.36), (0.16, 0.46), (0.16, 0.56)]
                 funnel_right = [(0.84, 0.36), (0.84, 0.46), (0.84, 0.56)]
                 center_entry = [(0.50, 0.70)]
-                deploy_plan = funnel_left + funnel_right + center_entry
+
+                # Intercala esquerda/direita para garantir drops nos dois lados mesmo
+                # quando o tempo do slot (deploy_slot_limit_s) é curto.
+                deploy_plan = []
+                for i in range(max(len(funnel_left), len(funnel_right))):
+                    if i < len(funnel_left):
+                        deploy_plan.append(funnel_left[i])
+                    if i < len(funnel_right):
+                        deploy_plan.append(funnel_right[i])
+                deploy_plan += center_entry
 
                 async def tap_many(
                     xp: float,
