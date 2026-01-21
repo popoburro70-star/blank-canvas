@@ -213,16 +213,16 @@ class ADBController:
         try:
             image = Image.open(io.BytesIO(screenshot))
 
-            # Região padrão de recursos (topo direito).
-            # OBS: alguns emuladores/escala mudam a posição do HUD, então usamos uma
-            # área um pouco mais "folgada" para reduzir falsos 0/0.
+             # Região padrão de recursos (saque disponível) — topo esquerdo.
+             # OBS: alguns emuladores/escala mudam a posição do HUD, então usamos uma
+             # área um pouco mais "folgada" para reduzir falsos 0/0.
             if region == "resources":
                 w, h = image.size
-                # percentuais (0..1)
-                x1 = int(w * 0.45)
-                y1 = int(h * 0.00)
-                x2 = int(w * 0.995)
-                y2 = int(h * 0.22)
+                 # percentuais (0..1) - alinhado ao bloco "Saque disponível" no canto superior esquerdo
+                 x1 = int(w * 0.00)
+                 y1 = int(h * 0.02)
+                 x2 = int(w * 0.42)
+                 y2 = int(h * 0.30)
                 image = image.crop((x1, y1, x2, y2))
             elif region:
                 x, y, w, h = region
@@ -249,18 +249,20 @@ class ADBController:
             return {"error": str(e), "resources": {}}
     
     def _extract_resources(self, text: str) -> Dict[str, int]:
-        """Extrai valores de recursos do texto OCR.
+         """Extrai valores de recursos do texto OCR.
 
-        Observação: a região de OCR pode conter outros números (ex.: troféus, custo, etc.).
-        Para reduzir falsos negativos (pular vila boa), pegamos os MAIORES valores encontrados.
-        """
+         Estratégia:
+         - Como estamos lendo o bloco "Saque disponível" (3 linhas), priorizamos a ORDEM de aparição
+           (ouro -> elixir -> elixir negro), que é mais estável.
+         - Se vier ruído/menos números, fazemos fallback para a estratégia dos maiores valores.
+         """
         import re
         resources = {"gold": 0, "elixir": 0, "dark_elixir": 0}
 
         # Procurar por números grandes (recursos típicos do COC)
         numbers = re.findall(r'(\d{1,3}(?:[,.]\d{3})*|\d+)\s*([kKmM])?', text)
 
-        parsed_values = []
+         parsed_values = []
         for num, suffix in numbers:
             try:
                 value = int(num.replace(",", "").replace(".", ""))
@@ -273,14 +275,23 @@ class ADBController:
             except ValueError:
                 pass
 
-        # Estratégia robusta: usar os maiores valores encontrados como Gold/Elixir/DE
-        parsed_values.sort(reverse=True)
-        if len(parsed_values) >= 1:
-            resources["gold"] = parsed_values[0]
-        if len(parsed_values) >= 2:
-            resources["elixir"] = parsed_values[1]
-        if len(parsed_values) >= 3:
-            resources["dark_elixir"] = parsed_values[2]
+         # Primário: ordem de aparição (ouro, elixir, elixir negro)
+         if len(parsed_values) >= 1:
+             resources["gold"] = parsed_values[0]
+         if len(parsed_values) >= 2:
+             resources["elixir"] = parsed_values[1]
+         if len(parsed_values) >= 3:
+             resources["dark_elixir"] = parsed_values[2]
+
+         # Fallback: se faltar algum, tenta preencher com os maiores valores
+         if resources["gold"] == 0 or resources["elixir"] == 0:
+             fallback = sorted(parsed_values, reverse=True)
+             if resources["gold"] == 0 and len(fallback) >= 1:
+                 resources["gold"] = fallback[0]
+             if resources["elixir"] == 0 and len(fallback) >= 2:
+                 resources["elixir"] = fallback[1]
+             if resources["dark_elixir"] == 0 and len(fallback) >= 3:
+                 resources["dark_elixir"] = fallback[2]
 
         return resources
 
