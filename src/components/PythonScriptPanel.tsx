@@ -502,6 +502,11 @@ class BotController:
                 self.current_step = "deploy_troops"
                 await send_log("info", "Deployando tropas (funil + centro)...")
 
+                # Limite duro: não ficar preso em loop de deploy se OCR falhar/oscilar.
+                # Após X segundos, seguimos o fluxo para "Ataque em progresso".
+                deploy_start_ts = time.time()
+                deploy_limit_s = int(self.config.get("deploy_limit_s", 90))
+
                 # --- Estratégia simples e robusta ---
                 # 1) Funil: borda esquerda + borda direita (varrendo de cima pra baixo)
                 # 2) Entrada: alguns drops no centro pra "empurrar" a vila
@@ -596,6 +601,16 @@ class BotController:
                     if not self.running:
                         break
 
+                    if (time.time() - deploy_start_ts) >= deploy_limit_s:
+                        await send_log(
+                            "warning",
+                            f"Deploy de tropas atingiu {deploy_limit_s}s. Seguindo para Ataque em progresso...",
+                        )
+                        break
+
+                    slot_start_ts = time.time()
+                    slot_limit_s = int(self.config.get("deploy_slot_limit_s", 25))
+
                     # Seleciona slot e tenta ler quantas tropas ainda existem.
                     # Se OCR falhar (0), fazemos um "probe" (alguns taps) para não deixar
                     # tropas sem deploy por causa de OCR instável.
@@ -643,6 +658,22 @@ class BotController:
 
                     # Solta por "pacotes" em poucos pontos; revalida via OCR a cada pacote.
                     while self.running and count > 0:
+                        # Safety: limite geral + limite por slot
+                        if (time.time() - deploy_start_ts) >= deploy_limit_s:
+                            await send_log(
+                                "warning",
+                                f"Deploy de tropas atingiu {deploy_limit_s}s durante {slot}. Seguindo...",
+                            )
+                            count = 0
+                            break
+
+                        if (time.time() - slot_start_ts) >= slot_limit_s:
+                            await send_log(
+                                "warning",
+                                f"Slot {slot}: limite de {slot_limit_s}s atingido. Prosseguindo para o próximo slot.",
+                            )
+                            break
+
                         # Seleciona slot sempre antes de soltar
                         await safe_tap_slot(slot)
                         await asyncio.sleep(0.12)
