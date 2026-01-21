@@ -260,8 +260,8 @@ class ADBController:
         resources = {"gold": 0, "elixir": 0, "dark_elixir": 0}
 
         # Procurar por números grandes (recursos típicos do COC)
-        numbers = re.findall(r'(\d{1,3}(?:[,.]\d{3})*|\d+)\s*([kKmM])?', text)
-
+         numbers = re.findall(r'(\d{1,3}(?:[,.]\d{3})*|\d+)\s*([kKmM])?', text)
+ 
          parsed_values = []
         for num, suffix in numbers:
             try:
@@ -282,7 +282,7 @@ class ADBController:
              resources["elixir"] = parsed_values[1]
          if len(parsed_values) >= 3:
              resources["dark_elixir"] = parsed_values[2]
-
+ 
          # Fallback: se faltar algum, tenta preencher com os maiores valores
          if resources["gold"] == 0 or resources["elixir"] == 0:
              fallback = sorted(parsed_values, reverse=True)
@@ -1147,8 +1147,21 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
   ({ className, ...props }, ref) => {
     const [copied, setCopied] = React.useState(false);
 
+     const normalizedScript = React.useMemo(() => {
+       // Garante indentação consistente (múltiplos de 4 espaços) para evitar IndentationError.
+       const lines = PYTHON_SCRIPT.replace(/\t/g, '    ').replace(/\r\n/g, '\n').split('\n');
+       const fixed = lines.map((line) => {
+         const m = line.match(/^( +)/);
+         if (!m) return line.replace(/[ \t]+$/g, '');
+         const lead = m[1].length;
+         const fixedLead = lead - (lead % 4);
+         return ' '.repeat(fixedLead) + line.slice(lead).replace(/[ \t]+$/g, '');
+       });
+       return fixed.join('\n');
+     }, []);
+
     const handleCopy = async () => {
-      await navigator.clipboard.writeText(PYTHON_SCRIPT);
+      await navigator.clipboard.writeText(normalizedScript);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     };
@@ -1156,7 +1169,7 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
     const handleDownload = () => {
       // Alguns navegadores/ambientes (ex.: Safari/WebView) não iniciam o download
       // se o <a> não estiver no DOM ou se o ObjectURL for revogado imediatamente.
-      const blob = new Blob([PYTHON_SCRIPT], { type: 'text/x-python;charset=utf-8' });
+      const blob = new Blob([normalizedScript], { type: 'text/x-python;charset=utf-8' });
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement('a');
