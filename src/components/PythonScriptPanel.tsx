@@ -404,6 +404,12 @@ class BotController:
                 delay_after_find_match_ms = self.config.get("delay_after_find_match_ms", 5500)
                 await asyncio.sleep(delay_after_find_match_ms / 1000.0)  # Esperar carregar busca
 
+                # 3.1 Confirmar/acionar "Atacar!" imediatamente após "Procurar partida"
+                # (alguns layouts exigem esse clique para iniciar a busca)
+                await send_log("info", "Confirmando Atacar! (após Procurar partida)...")
+                await _to_thread(self.adb.tap_percent, *self._coord("attack_start"))
+                await asyncio.sleep(1.0)
+
                 # 4. Loop de busca de vila
                 found_target = False
                 search_attempts = 0
@@ -516,11 +522,6 @@ class BotController:
                 # 6. Deploy de tropas
                 self.current_step = "deploy_troops"
                 await send_log("info", "Deployando tropas (funil + centro)...")
-
-                # Garantia extra: em alguns casos o tap do "Atacar!" pode falhar por timing/layout.
-                # Então reforçamos 1x aqui antes de tentar selecionar slots de tropas.
-                await _to_thread(self.adb.tap_percent, *self._coord("attack_start"))
-                await asyncio.sleep(1.2)
 
                 # Limite duro: não ficar preso em loop de deploy se OCR falhar/oscilar.
                 # Após X segundos, seguimos o fluxo para "Ataque em progresso".
