@@ -328,15 +328,18 @@ class BotController:
             "return_home": (0.50, 0.88),
 
             # Seleção de tropas (parte inferior da tela durante ataque)
-            "troop_slot_1": (0.20, 0.95),
-            "troop_slot_2": (0.30, 0.95),
-            "troop_slot_3": (0.40, 0.95),
-            "troop_slot_4": (0.50, 0.95),
-            # slots extras (ex.: mais tropas / máquina de cerco / layouts diferentes)
-            "troop_slot_5": (0.60, 0.95),
-            "troop_slot_6": (0.68, 0.95),
-            "troop_slot_7": (0.76, 0.95),
-            "troop_slot_8": (0.84, 0.95),
+            # Layout do print (até 11 slots)
+            "troop_slot_1": (0.07, 0.95),
+            "troop_slot_2": (0.15, 0.95),
+            "troop_slot_3": (0.23, 0.95),
+            "troop_slot_4": (0.31, 0.95),
+            "troop_slot_5": (0.39, 0.95),
+            "troop_slot_6": (0.47, 0.95),
+            "troop_slot_7": (0.55, 0.95),
+            "troop_slot_8": (0.63, 0.95),
+            "troop_slot_9": (0.70, 0.95),
+            "troop_slot_10": (0.76, 0.95),
+            "troop_slot_11": (0.82, 0.95),
 
             # Feitiços (geralmente no canto direito)
             "spell_slot_1": (0.86, 0.95),
@@ -514,6 +517,11 @@ class BotController:
                 self.current_step = "deploy_troops"
                 await send_log("info", "Deployando tropas (funil + centro)...")
 
+                # Garantia extra: em alguns casos o tap do "Atacar!" pode falhar por timing/layout.
+                # Então reforçamos 1x aqui antes de tentar selecionar slots de tropas.
+                await _to_thread(self.adb.tap_percent, *self._coord("attack_start"))
+                await asyncio.sleep(1.2)
+
                 # Limite duro: não ficar preso em loop de deploy se OCR falhar/oscilar.
                 # Após X segundos, seguimos o fluxo para "Ataque em progresso".
                 deploy_start_ts = time.time()
@@ -534,6 +542,9 @@ class BotController:
                     "troop_slot_6",
                     "troop_slot_7",
                     "troop_slot_8",
+                    "troop_slot_9",
+                    "troop_slot_10",
+                    "troop_slot_11",
                 ]
 
                 async def safe_tap_slot(slot_key: str):
