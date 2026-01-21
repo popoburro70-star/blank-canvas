@@ -670,7 +670,10 @@ class BotController:
                 await _to_thread(self.adb.tap_percent, *self.coords["end_battle"])
                 await asyncio.sleep(1)
                 await _to_thread(self.adb.tap_percent, *self.coords["end_battle_confirm"])
-                await asyncio.sleep(3)
+                # Aguarda o painel de vitória carregar antes do OCR dos ganhos
+                victory_screen_wait_s = float(self.config.get("victory_screen_wait_s", 4))
+                await send_log("info", f"Aguardando painel de ganhos ({victory_screen_wait_s:.0f}s)...")
+                await asyncio.sleep(max(0.0, victory_screen_wait_s))
 
                 # 7.1 Ler ganhos no painel de vitória ("Você ganhou")
                 # Objetivo: pegar exatamente os valores de ouro/elixir/DE ganhos, não estimativa.
