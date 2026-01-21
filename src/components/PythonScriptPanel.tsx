@@ -260,9 +260,9 @@ class ADBController:
         resources = {"gold": 0, "elixir": 0, "dark_elixir": 0}
 
         # Procurar por números grandes (recursos típicos do COC)
-         numbers = re.findall(r'(\d{1,3}(?:[,.]\d{3})*|\d+)\s*([kKmM])?', text)
- 
-         parsed_values = []
+        numbers = re.findall(r'(\d{1,3}(?:[,.]\d{3})*|\d+)\s*([kKmM])?', text)
+
+        parsed_values = []
         for num, suffix in numbers:
             try:
                 value = int(num.replace(",", "").replace(".", ""))
@@ -275,23 +275,23 @@ class ADBController:
             except ValueError:
                 pass
 
-         # Primário: ordem de aparição (ouro, elixir, elixir negro)
-         if len(parsed_values) >= 1:
-             resources["gold"] = parsed_values[0]
-         if len(parsed_values) >= 2:
-             resources["elixir"] = parsed_values[1]
-         if len(parsed_values) >= 3:
-             resources["dark_elixir"] = parsed_values[2]
- 
-         # Fallback: se faltar algum, tenta preencher com os maiores valores
-         if resources["gold"] == 0 or resources["elixir"] == 0:
-             fallback = sorted(parsed_values, reverse=True)
-             if resources["gold"] == 0 and len(fallback) >= 1:
-                 resources["gold"] = fallback[0]
-             if resources["elixir"] == 0 and len(fallback) >= 2:
-                 resources["elixir"] = fallback[1]
-             if resources["dark_elixir"] == 0 and len(fallback) >= 3:
-                 resources["dark_elixir"] = fallback[2]
+        # Primário: ordem de aparição (ouro, elixir, elixir negro)
+        if len(parsed_values) >= 1:
+            resources["gold"] = parsed_values[0]
+        if len(parsed_values) >= 2:
+            resources["elixir"] = parsed_values[1]
+        if len(parsed_values) >= 3:
+            resources["dark_elixir"] = parsed_values[2]
+
+        # Fallback: se faltar algum, tenta preencher com os maiores valores
+        if resources["gold"] == 0 or resources["elixir"] == 0:
+            fallback = sorted(parsed_values, reverse=True)
+            if resources["gold"] == 0 and len(fallback) >= 1:
+                resources["gold"] = fallback[0]
+            if resources["elixir"] == 0 and len(fallback) >= 2:
+                resources["elixir"] = fallback[1]
+            if resources["dark_elixir"] == 0 and len(fallback) >= 3:
+                resources["dark_elixir"] = fallback[2]
 
         return resources
 
@@ -342,17 +342,15 @@ class BotController:
             # Layout do print (até 11 slots)
             # Observação: em alguns layouts (como no print), os ícones são mais largos;
             # então espaçamos mais as posições para evitar "pular" slots.
-            "troop_slot_1": (0.07, 0.95),
-            "troop_slot_2": (0.19, 0.95),
-            "troop_slot_3": (0.31, 0.95),
-            "troop_slot_4": (0.43, 0.95),
-            "troop_slot_5": (0.55, 0.95),
-            "troop_slot_6": (0.67, 0.95),
-            "troop_slot_7": (0.79, 0.95),
-            "troop_slot_8": (0.86, 0.95),
-            "troop_slot_9": (0.90, 0.95),
-            "troop_slot_10": (0.94, 0.95),
-            "troop_slot_11": (0.98, 0.95),
+            # Cada “quadrado” da barra é um slot. Usamos centros igualmente espaçados.
+            "troop_slot_1": (0.08, 0.95),
+            "troop_slot_2": (0.20, 0.95),
+            "troop_slot_3": (0.32, 0.95),
+            "troop_slot_4": (0.44, 0.95),
+            "troop_slot_5": (0.56, 0.95),
+            "troop_slot_6": (0.68, 0.95),
+            "troop_slot_7": (0.80, 0.95),
+            "troop_slot_8": (0.92, 0.95),
 
             # Feitiços (geralmente no canto direito)
             "spell_slot_1": (0.86, 0.95),
@@ -546,7 +544,7 @@ class BotController:
                 # 2) Entrada: alguns drops no centro pra "empurrar" a vila
                 # 3) Tenta soltar heróis e feitiços (melhor esforço, depende do layout)
 
-                # Tenta usar TODOS os slots de tropa disponíveis (inclui slots extras)
+                # Cada “quadrado” da barra é 1 slot. Iteramos somente 1..8 (calibráveis).
                 troop_slots = [
                     "troop_slot_1",
                     "troop_slot_2",
@@ -556,9 +554,6 @@ class BotController:
                     "troop_slot_6",
                     "troop_slot_7",
                     "troop_slot_8",
-                    "troop_slot_9",
-                    "troop_slot_10",
-                    "troop_slot_11",
                 ]
 
                 async def safe_tap_slot(slot_key: str):
@@ -567,57 +562,8 @@ class BotController:
                     except Exception:
                         pass
 
-                def _parse_int(s: str) -> int:
-                    digits = "".join(ch for ch in (s or "") if ch.isdigit())
-                    return int(digits) if digits else 0
-
-                async def read_troop_count(slot_key: str) -> int:
-                    """Lê contagem do slot via OCR sem bloquear o WebSocket."""
-
-                    def _read_sync() -> int:
-                        shot = self.adb.screenshot()
-                        if not shot:
-                            return 0
-                        img = Image.open(io.BytesIO(shot)).convert("RGB")
-                        w, h = img.size
-
-                        sx, sy = self._coord(slot_key)
-                        cx = int(w * sx)
-                        cy = int(h * sy)
-
-                        # Crop configurável (calibração): relativo ao slot.
-                        crop_w_pct = float(self.config.get("troop_ocr_crop_w", 0.06))
-                        crop_h_pct = float(self.config.get("troop_ocr_crop_h", 0.06))
-                        off_x_pct = float(self.config.get("troop_ocr_offset_x", 0.0))
-                        off_y_pct = float(self.config.get("troop_ocr_offset_y", -0.03))
-
-                        crop_w = max(2, int(w * crop_w_pct))
-                        crop_h = max(2, int(h * crop_h_pct))
-
-                        ccx = int(cx + (w * off_x_pct))
-                        ccy = int(cy + (h * off_y_pct))
-
-                        x1 = max(0, ccx - crop_w // 2)
-                        y1 = max(0, ccy - crop_h // 2)
-                        x2 = min(w, ccx + crop_w // 2)
-                        y2 = min(h, ccy + crop_h // 2)
-                        roi = np.array(img.crop((x1, y1, x2, y2)))
-
-                        gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
-                        gray = cv2.resize(gray, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
-                        gray = cv2.GaussianBlur(gray, (3, 3), 0)
-                        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-                        txt = pytesseract.image_to_string(
-                            th,
-                            config="--psm 7 -c tessedit_char_whitelist=0123456789",
-                        )
-                        return _parse_int(txt)
-
-                    try:
-                        return await _to_thread(_read_sync)
-                    except Exception:
-                        return 0
+                # IMPORTANTE: conforme solicitado, NÃO lemos a quantidade disponível (OCR do número do slot).
+                # Apenas selecionamos o slot e soltamos tropas por um tempo fixo (deploy_slot_limit_s).
 
                 # Deploy: mais "controlado" (menos espalhado) e rápido.
                 # Em vez de tocar em dezenas de pontos por lote, solta várias unidades em
@@ -648,96 +594,25 @@ class BotController:
                     slot_start_ts = time.time()
                     slot_limit_s = int(self.config.get("deploy_slot_limit_s", 3))
 
-                    # Seleciona slot e tenta ler quantas tropas ainda existem.
-                    # Se OCR falhar (0), NÃO fazemos fallback infinito.
-                    # Apenas tentamos por até 'deploy_slot_limit_s' e então seguimos para o próximo slot.
+                    await send_log("info", f"Slot {slot}: deploy por {slot_limit_s}s (sem OCR)")
+
+                    # Deploy por tempo fixo no slot
                     await safe_tap_slot(slot)
-                    await asyncio.sleep(0.22)
-                    initial = await read_troop_count(slot)
-
-                    # Caso OCR venha 0, tentamos deploy por um curto período (até o limite do slot),
-                    # sem "probes" extras que possam causar repetição infinita na mesma tropa.
-                    if initial <= 0:
-                        await send_log(
-                            "warning",
-                            f"Slot {slot}: OCR=0. Tentando deploy por até {slot_limit_s}s e seguindo.",
-                        )
-                        while self.running:
-                            if (time.time() - deploy_start_ts) >= deploy_limit_s:
-                                break
-                            if (time.time() - slot_start_ts) >= slot_limit_s:
-                                break
-
-                            await safe_tap_slot(slot)
-                            await asyncio.sleep(0.10)
-                            for (dx, dy) in deploy_plan:
-                                if not self.running:
-                                    break
-                                await tap_many(dx, dy, 6, delay_s=0.03)
-
-                            # se o OCR começar a ler, voltamos ao modo controlado
-                            await asyncio.sleep(0.12)
-                            maybe_count = await read_troop_count(slot)
-                            if maybe_count > 0:
-                                initial = maybe_count
-                                break
-
-                        # Se continuou 0, simplesmente passa para o próximo slot
-                        if initial <= 0:
-                            await send_log(
-                                "warning",
-                                f"Slot {slot}: sem leitura OCR dentro do limite. Prosseguindo para o próximo slot.",
-                            )
-                            continue
-
-                    await send_log("info", f"Slot {slot}: {initial} tropas detectadas (OCR)")
-
-                    unchanged_checks = 0
-                    last_count = initial
-                    count = initial
-
-                    # Solta por "pacotes" em poucos pontos; revalida via OCR a cada pacote.
-                    while self.running and count > 0:
-                        # Safety: limite geral + limite por slot
+                    await asyncio.sleep(0.12)
+                    while self.running:
                         if (time.time() - deploy_start_ts) >= deploy_limit_s:
-                            await send_log(
-                                "warning",
-                                f"Deploy de tropas atingiu {deploy_limit_s}s durante {slot}. Seguindo...",
-                            )
-                            count = 0
                             break
-
                         if (time.time() - slot_start_ts) >= slot_limit_s:
-                            await send_log(
-                                "warning",
-                                f"Slot {slot}: limite de {slot_limit_s}s atingido. Prosseguindo para o próximo slot.",
-                            )
                             break
 
-                        # Seleciona slot sempre antes de soltar
+                        # mantém o slot selecionado e solta em poucos pontos-chave
                         await safe_tap_slot(slot)
-                        await asyncio.sleep(0.12)
-
-                        # tamanho do pacote: quanto mais tropas, mais rápido solta
-                        # pacotes maiores (mais confiável); pode aumentar tempo de deploy
-                        taps_per_point = 8 if count >= 25 else 6 if count >= 10 else 3
-
+                        await asyncio.sleep(0.08)
                         for (dx, dy) in deploy_plan:
                             if not self.running:
                                 break
-                            await tap_many(dx, dy, taps_per_point, delay_s=0.03)
-
-                        # revalida contagem
-                        await safe_tap_slot(slot)
-                        await asyncio.sleep(0.18)
-                        new_count = await read_troop_count(slot)
-
-                        # Se OCR falhar (0), não ficamos presos: respeita o limite do slot.
-                        if new_count == 0 and count > 0:
-                            # deixa o loop continuar até estourar 'slot_limit_s'
-                            continue
-
-                        count = new_count
+                            await tap_many(dx, dy, 6, delay_s=0.03)
+                        await asyncio.sleep(0.10)
 
                         if count <= 0:
                             await send_log("success", f"Slot {slot}: tropas esgotadas")
