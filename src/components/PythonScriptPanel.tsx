@@ -633,7 +633,7 @@ class BotController:
                         break
 
                     slot_start_ts = time.time()
-                    slot_limit_s = int(self.config.get("deploy_slot_limit_s", 10))
+                    slot_limit_s = int(self.config.get("deploy_slot_limit_s", 3))
 
                     # Seleciona slot e tenta ler quantas tropas ainda existem.
                     # Se OCR falhar (0), NÃO fazemos fallback infinito.
