@@ -799,20 +799,91 @@ class BotController:
                 await asyncio.sleep(1)
                 await _to_thread(self.adb.tap_percent, *self.coords["end_battle_confirm"])
                 await asyncio.sleep(3)
+
+                # 7.1 Ler ganhos no painel de vitória ("Você ganhou")
+                # Objetivo: pegar exatamente os valores de ouro/elixir/DE ganhos, não estimativa.
+                def _parse_number_any(s: str) -> int:
+                    import re
+                    if not s:
+                        return 0
+                    # mantém apenas dígitos e separadores comuns
+                    cleaned = re.sub(r"[^0-9.,]", "", s)
+                    if not cleaned:
+                        return 0
+                    return int(cleaned.replace(".", "").replace(",", ""))
+
+                async def read_victory_loot() -> Dict[str, int]:
+                    def _read_sync() -> Dict[str, int]:
+                        shot = self.adb.screenshot()
+                        if not shot:
+                            return {"gold": 0, "elixir": 0, "dark_elixir": 0}
+                        img = Image.open(io.BytesIO(shot)).convert("RGB")
+                        w, h = img.size
+
+                        # Crop focado no bloco "Você ganhou" (centro), evitando o painel de bônus à direita.
+                        x1 = int(w * 0.34)
+                        y1 = int(h * 0.40)
+                        x2 = int(w * 0.64)
+                        y2 = int(h * 0.74)
+                        roi = np.array(img.crop((x1, y1, x2, y2)))
+
+                        gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
+                        gray = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+                        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+                        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+                        txt = pytesseract.image_to_string(
+                            th,
+                            config="--psm 6 -c tessedit_char_whitelist=0123456789.,",
+                        )
+
+                        # Esperamos 3 linhas com números (ouro, elixir, elixir negro)
+                        lines = [ln.strip() for ln in (txt or "").splitlines() if ln.strip()]
+                        nums = [_parse_number_any(ln) for ln in lines]
+                        nums = [n for n in nums if n > 0]
+
+                        # Melhor esforço: se vierem mais números, pegamos os 3 maiores *em ordem de aparição*.
+                        # (o bloco "Você ganhou" normalmente é a única coluna do crop)
+                        out = {"gold": 0, "elixir": 0, "dark_elixir": 0}
+                        if len(nums) >= 1:
+                            out["gold"] = nums[0]
+                        if len(nums) >= 2:
+                            out["elixir"] = nums[1]
+                        if len(nums) >= 3:
+                            out["dark_elixir"] = nums[2]
+                        return out
+
+                    try:
+                        return await _to_thread(_read_sync)
+                    except Exception:
+                        return {"gold": 0, "elixir": 0, "dark_elixir": 0}
+
+                loot = await read_victory_loot()
+                loot_gold = int(loot.get("gold", 0) or 0)
+                loot_elixir = int(loot.get("elixir", 0) or 0)
+                loot_dark = int(loot.get("dark_elixir", 0) or 0)
+
+                if loot_gold == 0 and loot_elixir == 0 and loot_dark == 0:
+                    await send_log(
+                        "warning",
+                        "Não consegui ler os ganhos no painel de vitória (OCR=0). Vou registrar 0 e seguir.",
+                    )
                 
                 # 8. Voltar para casa
                 self.current_step = "return_home"
                 await _to_thread(self.adb.tap_percent, *self.coords["return_home"])
                 await asyncio.sleep(3)
-                
-                # Atualizar stats (estimativa de 50% dos recursos)
-                collected_gold = gold // 2
-                collected_elixir = elixir // 2
+
+                # Atualizar stats (valores reais via OCR no painel de vitória)
                 self.stats["attacks"] += 1
-                self.stats["gold"] += collected_gold
-                self.stats["elixir"] += collected_elixir
-                
-                await send_log("success", f"✓ Ataque #{self.stats['attacks']} concluído! +{collected_gold:,} ouro, +{collected_elixir:,} elixir")
+                self.stats["gold"] += loot_gold
+                self.stats["elixir"] += loot_elixir
+                self.stats["dark_elixir"] += loot_dark
+
+                await send_log(
+                    "success",
+                    f"✓ Ataque #{self.stats['attacks']} concluído! +{loot_gold:,} ouro, +{loot_elixir:,} elixir, +{loot_dark:,} DE",
+                )
 
                 # Enviar stats atualizadas para o painel web
                 if self.ws_server:
