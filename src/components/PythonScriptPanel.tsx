@@ -211,19 +211,19 @@ class ADBController:
             }
 
         try:
-             image = Image.open(io.BytesIO(screenshot))
+            image = Image.open(io.BytesIO(screenshot))
 
-             # Região padrão de recursos (saque disponível) — topo esquerdo.
-             # OBS: alguns emuladores/escala mudam a posição do HUD, então usamos uma
-             # área um pouco mais "folgada" para reduzir falsos 0/0.
-             if region == "resources":
-                 w, h = image.size
-                 # percentuais (0..1) - alinhado ao bloco "Saque disponível" no canto superior esquerdo
-                 x1 = int(w * 0.00)
-                 y1 = int(h * 0.02)
-                 x2 = int(w * 0.42)
-                 y2 = int(h * 0.30)
-                 image = image.crop((x1, y1, x2, y2))
+            # Região padrão de recursos (saque disponível) — topo esquerdo.
+            # OBS: alguns emuladores/escala mudam a posição do HUD, então usamos uma
+            # área um pouco mais "folgada" para reduzir falsos 0/0.
+            if region == "resources":
+                w, h = image.size
+                # percentuais (0..1) - alinhado ao bloco "Saque disponível" no canto superior esquerdo
+                x1 = int(w * 0.00)
+                y1 = int(h * 0.02)
+                x2 = int(w * 0.42)
+                y2 = int(h * 0.30)
+                image = image.crop((x1, y1, x2, y2))
             elif region:
                 x, y, w, h = region
                 image = image.crop((x, y, x + w, y + h))
@@ -249,13 +249,13 @@ class ADBController:
             return {"error": str(e), "resources": {}}
     
     def _extract_resources(self, text: str) -> Dict[str, int]:
-         """Extrai valores de recursos do texto OCR.
+        """Extrai valores de recursos do texto OCR.
 
-         Estratégia:
-         - Como estamos lendo o bloco "Saque disponível" (3 linhas), priorizamos a ORDEM de aparição
-           (ouro -> elixir -> elixir negro), que é mais estável.
-         - Se vier ruído/menos números, fazemos fallback para a estratégia dos maiores valores.
-         """
+        Estratégia:
+        - Como estamos lendo o bloco "Saque disponível" (3 linhas), priorizamos a ORDEM de aparição
+          (ouro -> elixir -> elixir negro), que é mais estável.
+        - Se vier ruído/menos números, fazemos fallback para a estratégia dos maiores valores.
+        """
         import re
         resources = {"gold": 0, "elixir": 0, "dark_elixir": 0}
 
