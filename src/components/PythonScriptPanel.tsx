@@ -517,7 +517,7 @@ class BotController:
                 # Limite duro: não ficar preso em loop de deploy se OCR falhar/oscilar.
                 # Após X segundos, seguimos o fluxo para "Ataque em progresso".
                 deploy_start_ts = time.time()
-                deploy_limit_s = int(self.config.get("deploy_limit_s", 90))
+                deploy_limit_s = int(self.config.get("deploy_limit_s", 60))
 
                 # --- Estratégia simples e robusta ---
                 # 1) Funil: borda esquerda + borda direita (varrendo de cima pra baixo)
