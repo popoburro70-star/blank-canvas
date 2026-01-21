@@ -614,37 +614,6 @@ class BotController:
                             await tap_many(dx, dy, 6, delay_s=0.03)
                         await asyncio.sleep(0.10)
 
-                        if count <= 0:
-                            await send_log("success", f"Slot {slot}: tropas esgotadas")
-                            break
-
-                        # proteção contra OCR instável (se não mudar por 2 checks, para)
-                        if count >= last_count:
-                            unchanged_checks += 1
-                        else:
-                            unchanged_checks = 0
-                        last_count = count
-
-                        if unchanged_checks >= 2:
-                            await send_log(
-                                "warning",
-                                f"Slot {slot}: OCR não está diminuindo (atual={count}). Prosseguindo para o próximo slot.",
-                            )
-                            # Fallback final: tenta gastar o slot mesmo que o OCR esteja travado.
-                            for _ in range(2):
-                                if not self.running:
-                                    break
-                                await safe_tap_slot(slot)
-                                await asyncio.sleep(0.10)
-                                for (dx, dy) in deploy_plan:
-                                    if not self.running:
-                                        break
-                                    await tap_many(dx, dy, 10, delay_s=0.03)
-                                await asyncio.sleep(0.12)
-                            break
-
-                        await send_log("info", f"Slot {slot}: ainda restam ~{count} tropas")
-
                 # Heróis (melhor esforço): normalmente ficam no lado direito da barra inferior
                 await asyncio.sleep(0.3)
                 for hero_x in [0.70, 0.76, 0.82, 0.88]:
