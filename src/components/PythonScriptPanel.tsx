@@ -214,15 +214,15 @@ class ADBController:
             image = Image.open(io.BytesIO(screenshot))
 
             # Região padrão de recursos (saque disponível) — topo esquerdo.
-            # OBS: alguns emuladores/escala mudam a posição do HUD, então usamos uma
-            # área um pouco mais "folgada" para reduzir falsos 0/0.
+            # OBS: alguns emuladores/escala mudam a posição do HUD.
+            # Para evitar 0/0 persistente, usamos um recorte MAIS amplo por padrão.
             if region == "resources":
                 w, h = image.size
                 # percentuais (0..1) - alinhado ao bloco "Saque disponível" no canto superior esquerdo
                 x1 = int(w * 0.00)
                 y1 = int(h * 0.02)
-                x2 = int(w * 0.42)
-                y2 = int(h * 0.30)
+                x2 = int(w * 0.52)
+                y2 = int(h * 0.38)
                 image = image.crop((x1, y1, x2, y2))
             elif region:
                 x, y, w, h = region
@@ -235,7 +235,10 @@ class ADBController:
             gray = cv2.GaussianBlur(gray, (3, 3), 0)
             _, thr = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-            ocr_cfg = "--psm 6 -c tessedit_char_whitelist=0123456789kKmM.,"
+            # OCR config:
+            # - Para o bloco de recursos, NÃO restringimos whitelist, pois o jogo usa espaços como separador de milhar.
+            # - Para outras regiões, mantemos whitelist numérica para reduzir ruído.
+            ocr_cfg = "--psm 6" if region == "resources" else "--psm 6 -c tessedit_char_whitelist=0123456789kKmM.,"
             text = pytesseract.image_to_string(thr, config=ocr_cfg)
 
             resources = self._extract_resources(text)
