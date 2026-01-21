@@ -691,26 +691,30 @@ class BotController:
                     return int(cleaned.replace(".", "").replace(",", ""))
 
                 async def read_victory_loot() -> Dict[str, int]:
-                    def _read_sync() -> Dict[str, int]:
+                    victory_ocr_retries = int(self.config.get("victory_ocr_retries", 3))
+                    victory_ocr_debug = bool(self.config.get("victory_ocr_debug", False))
+
+                    def _read_sync() -> Tuple[Dict[str, int], Dict[str, str]]:
                         shot = self.adb.screenshot()
                         if not shot:
-                            return {"gold": 0, "elixir": 0, "dark_elixir": 0}
+                            return {"gold": 0, "elixir": 0, "dark_elixir": 0}, {}
+
                         img = Image.open(io.BytesIO(shot)).convert("RGB")
                         w, h = img.size
 
-                        # Crop focado no bloco "Você ganhou" (centro), evitando o painel de bônus à direita.
-                        x1 = int(w * 0.34)
-                        y1 = int(h * 0.40)
-                        x2 = int(w * 0.64)
-                        y2 = int(h * 0.74)
-                        roi = img.crop((x1, y1, x2, y2))
+                        # Tentativas de ROI (alguns emuladores mudam muito o layout/escala)
+                        roi_presets = [
+                            # mais "apertado" (rápido quando encaixa)
+                            (0.34, 0.40, 0.64, 0.74),
+                            # mais amplo (tende a funcionar melhor em escalas diferentes)
+                            (0.28, 0.36, 0.72, 0.80),
+                        ]
 
                         # IMPORTANT: não use "lista de números" aqui.
-                        # Em alguns casos o OCR troca a ordem e o Elixir Negro acaba indo para o campo Elixir.
                         # Para ficar estável, separamos o bloco em 3 faixas (ouro / elixir / elixir negro)
                         # e fazemos OCR por faixa.
 
-                        def _ocr_band(y_from: float, y_to: float) -> int:
+                        def _ocr_band(roi: Image.Image, y_from: float, y_to: float, invert: bool) -> Tuple[int, str]:
                             band = roi.crop((
                                 0,
                                 int(roi.size[1] * y_from),
@@ -721,23 +725,62 @@ class BotController:
                             g = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
                             g = cv2.resize(g, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
                             g = cv2.GaussianBlur(g, (3, 3), 0)
-                            _, t = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                            thresh_type = cv2.THRESH_BINARY_INV if invert else cv2.THRESH_BINARY
+                            _, t = cv2.threshold(g, 0, 255, thresh_type + cv2.THRESH_OTSU)
+                            # psm 6 costuma ser mais tolerante do que psm 7 (linha única)
                             txt = pytesseract.image_to_string(
                                 t,
-                                config="--psm 7 -c tessedit_char_whitelist=0123456789.,",
+                                config="--psm 6 -c tessedit_char_whitelist=0123456789.,",
                             )
-                            return _parse_number_any(txt)
+                            return _parse_number_any(txt), txt
 
-                        out = {
-                            "gold": _ocr_band(0.06, 0.36),
-                            "elixir": _ocr_band(0.36, 0.66),
-                            "dark_elixir": _ocr_band(0.66, 0.96),
-                        }
+                        best = {"gold": 0, "elixir": 0, "dark_elixir": 0}
+                        best_raw: Dict[str, str] = {}
+                        best_sum = 0
 
-                        return out
+                        # roda combinações (ROI preset x invert) até achar algo plausível
+                        for (rx1, ry1, rx2, ry2) in roi_presets:
+                            roi = img.crop((int(w * rx1), int(h * ry1), int(w * rx2), int(h * ry2)))
+                            for invert in (False, True):
+                                g, raw_g = _ocr_band(roi, 0.06, 0.36, invert)
+                                e, raw_e = _ocr_band(roi, 0.36, 0.66, invert)
+                                d, raw_d = _ocr_band(roi, 0.66, 0.96, invert)
+                                s = int(g) + int(e) + int(d)
+                                if s > best_sum:
+                                    best_sum = s
+                                    best = {"gold": int(g), "elixir": int(e), "dark_elixir": int(d)}
+                                    best_raw = {"gold": raw_g, "elixir": raw_e, "dark_elixir": raw_d}
+                                # early exit se já temos algo bom
+                                if s >= 5000:
+                                    return best, best_raw
+
+                        return best, best_raw
 
                     try:
-                        return await _to_thread(_read_sync)
+                        best_loot: Dict[str, int] = {"gold": 0, "elixir": 0, "dark_elixir": 0}
+                        best_raw: Dict[str, str] = {}
+
+                        tries = max(1, min(victory_ocr_retries, 6))
+                        for i in range(tries):
+                            loot_i, raw_i = await _to_thread(_read_sync)
+                            if (loot_i.get("gold", 0) + loot_i.get("elixir", 0) + loot_i.get("dark_elixir", 0)) > (
+                                best_loot.get("gold", 0) + best_loot.get("elixir", 0) + best_loot.get("dark_elixir", 0)
+                            ):
+                                best_loot, best_raw = loot_i, raw_i
+                            if (best_loot.get("gold", 0) + best_loot.get("elixir", 0) + best_loot.get("dark_elixir", 0)) > 0:
+                                break
+                            await asyncio.sleep(0.4)  # micro atraso para o painel estabilizar
+
+                        if victory_ocr_debug or (
+                            best_loot.get("gold", 0) == 0
+                            and best_loot.get("elixir", 0) == 0
+                            and best_loot.get("dark_elixir", 0) == 0
+                        ):
+                            await send_log("info", f"[DEBUG] OCR vitória raw gold: {best_raw.get('gold','').strip()}")
+                            await send_log("info", f"[DEBUG] OCR vitória raw elixir: {best_raw.get('elixir','').strip()}")
+                            await send_log("info", f"[DEBUG] OCR vitória raw DE: {best_raw.get('dark_elixir','').strip()}")
+
+                        return best_loot
                     except Exception:
                         return {"gold": 0, "elixir": 0, "dark_elixir": 0}
 
