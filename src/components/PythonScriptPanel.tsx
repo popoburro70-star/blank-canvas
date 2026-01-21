@@ -211,19 +211,19 @@ class ADBController:
             }
 
         try:
-            image = Image.open(io.BytesIO(screenshot))
+             image = Image.open(io.BytesIO(screenshot))
 
              # Região padrão de recursos (saque disponível) — topo esquerdo.
              # OBS: alguns emuladores/escala mudam a posição do HUD, então usamos uma
              # área um pouco mais "folgada" para reduzir falsos 0/0.
-            if region == "resources":
-                w, h = image.size
+             if region == "resources":
+                 w, h = image.size
                  # percentuais (0..1) - alinhado ao bloco "Saque disponível" no canto superior esquerdo
                  x1 = int(w * 0.00)
                  y1 = int(h * 0.02)
                  x2 = int(w * 0.42)
                  y2 = int(h * 0.30)
-                image = image.crop((x1, y1, x2, y2))
+                 image = image.crop((x1, y1, x2, y2))
             elif region:
                 x, y, w, h = region
                 image = image.crop((x, y, x + w, y + h))
