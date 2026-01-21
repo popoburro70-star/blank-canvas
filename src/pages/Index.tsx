@@ -1,45 +1,142 @@
+import { useBotState } from '@/hooks/useBotState';
+import { Header } from '@/components/Header';
+import { BotControls } from '@/components/BotControls';
+import { FlowChart } from '@/components/FlowChart';
+import { ConfigPanel } from '@/components/ConfigPanel';
+import { StatsPanel } from '@/components/StatsPanel';
+import { LogsPanel } from '@/components/LogsPanel';
+import { PythonScriptPanel } from '@/components/PythonScriptPanel';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Activity, Settings, ScrollText, LayoutGrid, Code } from 'lucide-react';
+
 const Index = () => {
+  const {
+    status,
+    currentStep,
+    config,
+    stats,
+    logs,
+    startBot,
+    pauseBot,
+    stopBot,
+    resumeBot,
+    updateConfig,
+    clearLogs,
+    resetBotState,
+    connectionStatus,
+    connect,
+    disconnect,
+    useRealADB,
+    toggleRealADB,
+    screenshotBase64,
+    requestScreenshot,
+    tapPercent,
+    isConnected,
+  } = useBotState();
+
   return (
-    <main className="relative min-h-screen bg-background">
-      {/* Signature moment: subtle ambient light fields */}
-      <div className="pointer-events-none absolute inset-0 bg-hero" aria-hidden="true" />
+    <div className="min-h-screen bg-background">
+      <Header 
+        status={status} 
+        connectionStatus={connectionStatus}
+        onConnect={connect}
+        onDisconnect={disconnect}
+        useRealADB={useRealADB}
+        onToggleRealADB={toggleRealADB}
+      />
+      
+      <main className="container py-6 space-y-6">
+        {/* Controls */}
+        <Card className="border-border bg-card/80 backdrop-blur-sm">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Activity className="w-5 h-5 text-primary" />
+                <span className="font-gaming text-sm tracking-wider">CONTROLES DO BOT</span>
+                {useRealADB && (
+                  <span className="px-2 py-0.5 text-[10px] font-gaming rounded bg-success/20 text-success border border-success/30">
+                    MODO REAL
+                  </span>
+                )}
+              </div>
+              <BotControls
+                status={status}
+                onStart={startBot}
+                onPause={pauseBot}
+                onStop={stopBot}
+                onResume={resumeBot}
+                forceStopVisible={useRealADB && isConnected}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-      <div className="relative mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6 py-16">
-        <section className="w-full rounded-lg border bg-card/70 p-8 shadow-soft backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          <header className="space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">Starter</p>
-            <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
-              Projeto em branco
-            </h1>
-            <p className="max-w-prose text-pretty text-base text-muted-foreground">
-              Este é um canvas limpo para você começar. Diga o que quer construir (landing page, dashboard,
-              app com login, etc.) e eu monto a primeira versão.
-            </p>
-          </header>
+        {/* Stats */}
+        <StatsPanel stats={stats} />
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="#"
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              Começar
-            </a>
-            <a
-              href="https://docs.lovable.dev/"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-md border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              Ver docs
-            </a>
-          </div>
-        </section>
+        {/* Main content */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Flow Chart */}
+          <Card className="lg:col-span-1 border-border bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 font-gaming text-sm tracking-wider">
+                <LayoutGrid className="w-4 h-4 text-primary" />
+                FLUXO DE EXECUÇÃO
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FlowChart currentStep={currentStep} />
+            </CardContent>
+          </Card>
 
-        <footer className="mt-8 text-center text-xs text-muted-foreground">
-          Dica: descreva o objetivo, público-alvo e 2–3 referências visuais.
-        </footer>
-      </div>
-    </main>
+          {/* Config and Logs */}
+          <Card className="lg:col-span-2 border-border bg-card/80 backdrop-blur-sm">
+            <Tabs defaultValue="config" className="h-full">
+              <CardHeader className="pb-3">
+                <TabsList className="bg-secondary/50">
+                  <TabsTrigger value="config" className="gap-2 font-gaming text-xs tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Settings className="w-3.5 h-3.5" />
+                    CONFIGURAÇÃO
+                  </TabsTrigger>
+                  <TabsTrigger value="logs" className="gap-2 font-gaming text-xs tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <ScrollText className="w-3.5 h-3.5" />
+                    LOGS
+                  </TabsTrigger>
+                  <TabsTrigger value="script" className="gap-2 font-gaming text-xs tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    <Code className="w-3.5 h-3.5" />
+                    SCRIPT
+                  </TabsTrigger>
+                </TabsList>
+              </CardHeader>
+              <CardContent>
+                  <TabsContent value="config" className="mt-0">
+                    <ConfigPanel 
+                      config={config} 
+                      onUpdate={updateConfig}
+                      disabled={status === 'running'}
+                      screenshotBase64={screenshotBase64}
+                      onRequestScreenshot={requestScreenshot}
+                      onTapPercent={tapPercent}
+                      onResetBotState={resetBotState}
+                      useRealADB={useRealADB}
+                      connectionStatus={connectionStatus}
+                      isConnected={isConnected}
+                      onConnect={connect}
+                    />
+                  </TabsContent>
+                <TabsContent value="logs" className="mt-0">
+                  <LogsPanel logs={logs} onClear={clearLogs} />
+                </TabsContent>
+                <TabsContent value="script" className="mt-0">
+                  <PythonScriptPanel />
+                </TabsContent>
+              </CardContent>
+            </Tabs>
+          </Card>
+        </div>
+      </main>
+    </div>
   );
 };
 
