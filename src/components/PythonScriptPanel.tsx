@@ -591,9 +591,23 @@ class BotController:
                 center_entry = [(0.50, 0.70)]
                 deploy_plan = funnel_left + funnel_right + center_entry
 
-                async def tap_many(xp: float, yp: float, n: int, delay_s: float = 0.02):
+                async def tap_many(
+                    xp: float,
+                    yp: float,
+                    n: int,
+                    *,
+                    delay_s: float = 0.02,
+                    deploy_deadline_ts: Optional[float] = None,
+                    slot_deadline_ts: Optional[float] = None,
+                ):
+                    """Dá N taps, mas respeita os deadlines em tempo real (global e por slot)."""
                     for _ in range(max(0, n)):
                         if not self.running:
+                            return
+                        now = time.time()
+                        if deploy_deadline_ts is not None and now >= deploy_deadline_ts:
+                            return
+                        if slot_deadline_ts is not None and now >= slot_deadline_ts:
                             return
                         await _to_thread(self.adb.tap_percent, xp, yp)
                         await asyncio.sleep(delay_s)
@@ -610,7 +624,9 @@ class BotController:
                         break
 
                     slot_start_ts = time.time()
-                    slot_limit_s = int(self.config.get("deploy_slot_limit_s", 3))
+                    slot_limit_s = float(self.config.get("deploy_slot_limit_s", 3))
+                    deploy_deadline_ts = deploy_start_ts + float(deploy_limit_s)
+                    slot_deadline_ts = slot_start_ts + max(0.0, slot_limit_s)
 
                     await send_log("info", f"Slot {slot}: deploy por {slot_limit_s}s (sem OCR)")
 
@@ -618,18 +634,31 @@ class BotController:
                     await safe_tap_slot(slot)
                     await asyncio.sleep(0.12)
                     while self.running:
-                        if (time.time() - deploy_start_ts) >= deploy_limit_s:
+                        now = time.time()
+                        if now >= deploy_deadline_ts:
                             break
-                        if (time.time() - slot_start_ts) >= slot_limit_s:
+                        if now >= slot_deadline_ts:
                             break
 
                         # mantém o slot selecionado e solta em poucos pontos-chave
+                        # Reforça seleção, mas também respeita o limite do slot em tempo real
+                        if time.time() >= slot_deadline_ts:
+                            break
                         await safe_tap_slot(slot)
                         await asyncio.sleep(0.08)
                         for (dx, dy) in deploy_plan:
                             if not self.running:
                                 break
-                            await tap_many(dx, dy, 6, delay_s=0.03)
+                            if time.time() >= slot_deadline_ts:
+                                break
+                            await tap_many(
+                                dx,
+                                dy,
+                                6,
+                                delay_s=0.03,
+                                deploy_deadline_ts=deploy_deadline_ts,
+                                slot_deadline_ts=slot_deadline_ts,
+                            )
                         await asyncio.sleep(0.10)
 
                 # Heróis (melhor esforço): normalmente ficam no lado direito da barra inferior
