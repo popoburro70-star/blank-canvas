@@ -346,18 +346,20 @@ class BotController:
             "return_home": (0.50, 0.88),
 
             # Seleção de tropas (parte inferior da tela durante ataque)
-            # Layout do print (até 11 slots)
-            # Observação: em alguns layouts (como no print), os ícones são mais largos;
-            # então espaçamos mais as posições para evitar "pular" slots.
-            # Cada “quadrado” da barra é um slot. Usamos centros igualmente espaçados.
-            "troop_slot_1": (0.08, 0.95),
-            "troop_slot_2": (0.20, 0.95),
-            "troop_slot_3": (0.32, 0.95),
-            "troop_slot_4": (0.44, 0.95),
-            "troop_slot_5": (0.56, 0.95),
-            "troop_slot_6": (0.68, 0.95),
-            "troop_slot_7": (0.80, 0.95),
-            "troop_slot_8": (0.92, 0.95),
+            # IMPORTANTE: no COC normalmente existem ATÉ 11 slots de tropas na barra.
+            # Se usarmos apenas 8 pontos “iguais”, isso tende a mapear para slots errados (pula 1,4, etc.).
+            # Cada “quadrado” da barra é um slot: calibramos 11 centros igualmente espaçados.
+            "troop_slot_1": (0.06, 0.95),
+            "troop_slot_2": (0.14, 0.95),
+            "troop_slot_3": (0.22, 0.95),
+            "troop_slot_4": (0.30, 0.95),
+            "troop_slot_5": (0.38, 0.95),
+            "troop_slot_6": (0.46, 0.95),
+            "troop_slot_7": (0.54, 0.95),
+            "troop_slot_8": (0.62, 0.95),
+            "troop_slot_9": (0.70, 0.95),
+            "troop_slot_10": (0.78, 0.95),
+            "troop_slot_11": (0.86, 0.95),
 
             # Feitiços (geralmente no canto direito)
             "spell_slot_1": (0.86, 0.95),
@@ -551,8 +553,9 @@ class BotController:
                 # 2) Entrada: alguns drops no centro pra "empurrar" a vila
                 # 3) Tenta soltar heróis e feitiços (melhor esforço, depende do layout)
 
-                # Cada “quadrado” da barra é 1 slot. Iteramos somente 1..8 (calibráveis).
-                troop_slots = [
+                # Cada “quadrado” da barra é 1 slot.
+                # Por padrão iteramos 1..11 (layout padrão do jogo). Se quiser limitar, use troop_slots_count.
+                troop_slots_all = [
                     "troop_slot_1",
                     "troop_slot_2",
                     "troop_slot_3",
@@ -561,7 +564,12 @@ class BotController:
                     "troop_slot_6",
                     "troop_slot_7",
                     "troop_slot_8",
+                    "troop_slot_9",
+                    "troop_slot_10",
+                    "troop_slot_11",
                 ]
+                troop_slots_count = int(self.config.get("troop_slots_count", 11))
+                troop_slots = troop_slots_all[: max(1, min(troop_slots_count, len(troop_slots_all)))]
 
                 async def safe_tap_slot(slot_key: str):
                     try:
