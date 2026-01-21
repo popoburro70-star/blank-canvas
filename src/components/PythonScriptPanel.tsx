@@ -260,12 +260,19 @@ class ADBController:
         resources = {"gold": 0, "elixir": 0, "dark_elixir": 0}
 
         # Procurar por números grandes (recursos típicos do COC)
-        numbers = re.findall(r'(\d{1,3}(?:[,.]\d{3})*|\d+)\s*([kKmM])?', text)
+        # No print, os milhares vêm separados por ESPAÇO (ex.: "905 968"), sem vírgula/ponto.
+        # Então aceitamos separadores: espaço, NBSP, ponto e vírgula (por robustez).
+        numbers = re.findall(r'(\d{1,3}(?:[\s\u00A0,\.]\d{3})*|\d+)\s*([kKmM])?', text)
 
         parsed_values = []
         for num, suffix in numbers:
             try:
-                value = int(num.replace(",", "").replace(".", ""))
+                value = int(
+                    num.replace(" ", "")
+                    .replace("\u00A0", "")
+                    .replace(",", "")
+                    .replace(".", "")
+                )
                 if suffix and suffix.lower() == 'k':
                     value *= 1000
                 elif suffix and suffix.lower() == 'm':
