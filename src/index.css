@@ -8,35 +8,46 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Fresh "blank canvas" theme: calm paper + ink + a single confident accent */
+    --background: 42 33% 98%;
+    --foreground: 222 35% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 35% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 35% 12%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Accent */
+    --primary: 268 84% 56%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 20% 96%;
+    --secondary-foreground: 222 35% 12%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 222 12% 42%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 268 84% 96%;
+    --accent-foreground: 268 70% 24%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 14% 88%;
+    --input: 220 14% 88%;
+    --ring: 268 84% 56%;
 
     --radius: 0.5rem;
+
+    /* Extra tokens (used as semantic utilities via Tailwind classes) */
+    --surface: 0 0% 100%;
+    --surface-2: 220 20% 96%;
+    --shadow-soft: 0 20px 60px -30px hsl(var(--foreground) / 0.25);
+    --shadow-glow: 0 22px 70px -40px hsl(var(--primary) / 0.55);
+    --hero-gradient: radial-gradient(900px circle at 15% 10%, hsl(var(--primary) / 0.16), transparent 55%),
+      radial-gradient(900px circle at 85% 20%, hsl(var(--accent) / 0.55), transparent 60%),
+      radial-gradient(800px circle at 55% 85%, hsl(var(--foreground) / 0.06), transparent 55%);
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +112,36 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-hero {
+    background-image: var(--hero-gradient);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .floaty {
+      animation: floaty 10s ease-in-out infinite;
+      will-change: transform;
+    }
+  }
+
+  @keyframes floaty {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -10px, 0);
+    }
   }
 }
