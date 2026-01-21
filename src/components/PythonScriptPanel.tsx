@@ -464,20 +464,23 @@ class BotController:
                     min_gold = self.config.get("min_gold", 200000)
                     min_elixir = self.config.get("min_elixir", 200000)
 
-                # Lógica mais permissiva: se OCR falhou completamente (0/0), ainda assim
-                # tenta atacar para não pular vilas boas por falha de leitura.
-                ocr_failed = (gold == 0 and elixir == 0)
-                meets_criteria = (gold >= min_gold and elixir >= min_elixir)
-                
-                if ocr_failed:
-                    await send_log("warning", f"OCR retornou 0/0. Atacando mesmo assim (possível falha de leitura)")
-                    found_target = True
-                elif meets_criteria:
+                    # Lógica mais permissiva: se OCR falhou completamente (0/0), ainda assim
+                    # tenta atacar para não pular vilas boas por falha de leitura.
+                    ocr_failed = (gold == 0 and elixir == 0)
+                    meets_criteria = (gold >= min_gold and elixir >= min_elixir)
+
+                    if ocr_failed:
+                        await send_log("warning", "OCR retornou 0/0. Atacando mesmo assim (possível falha de leitura)")
+                        found_target = True
+                    elif meets_criteria:
                         found_target = True
                         await send_log("success", f"✓ Vila encontrada! Ouro={gold:,}, Elixir={elixir:,}")
                     else:
                         # Clicar em "Próximo"
-                        await send_log("warning", f"Vila não atende (min: {min_gold:,}/{min_elixir:,}), próxima...")
+                        await send_log(
+                            "warning",
+                            f"Vila não atende (min: {min_gold:,}/{min_elixir:,}), próxima...",
+                        )
                         await _to_thread(self.adb.tap_percent, *self._coord("next_button"))
 
                         delay_after_next_village_ms = self.config.get("delay_after_next_village_ms", 3500)
