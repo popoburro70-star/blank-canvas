@@ -329,17 +329,19 @@ class BotController:
 
             # Seleção de tropas (parte inferior da tela durante ataque)
             # Layout do print (até 11 slots)
+            # Observação: em alguns layouts (como no print), os ícones são mais largos;
+            # então espaçamos mais as posições para evitar "pular" slots.
             "troop_slot_1": (0.07, 0.95),
-            "troop_slot_2": (0.15, 0.95),
-            "troop_slot_3": (0.23, 0.95),
-            "troop_slot_4": (0.31, 0.95),
-            "troop_slot_5": (0.39, 0.95),
-            "troop_slot_6": (0.47, 0.95),
-            "troop_slot_7": (0.55, 0.95),
-            "troop_slot_8": (0.63, 0.95),
-            "troop_slot_9": (0.70, 0.95),
-            "troop_slot_10": (0.76, 0.95),
-            "troop_slot_11": (0.82, 0.95),
+            "troop_slot_2": (0.19, 0.95),
+            "troop_slot_3": (0.31, 0.95),
+            "troop_slot_4": (0.43, 0.95),
+            "troop_slot_5": (0.55, 0.95),
+            "troop_slot_6": (0.67, 0.95),
+            "troop_slot_7": (0.79, 0.95),
+            "troop_slot_8": (0.86, 0.95),
+            "troop_slot_9": (0.90, 0.95),
+            "troop_slot_10": (0.94, 0.95),
+            "troop_slot_11": (0.98, 0.95),
 
             # Feitiços (geralmente no canto direito)
             "spell_slot_1": (0.86, 0.95),
