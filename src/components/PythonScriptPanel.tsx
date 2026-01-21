@@ -396,8 +396,7 @@ class BotController:
                 # 3. Clicar em "Procurar partida" (abaixo de "Batalha" no print)
                 await send_log("info", "Clicando em Procurar partida...")
                 await _to_thread(self.adb.tap_percent, *self._coord("find_match"))
-                await asyncio.sleep(0.6)
-                await _to_thread(self.adb.tap_percent, *self._coord("find_match"))
+                # 1 tap apenas (evita duplo clique acidental)
 
                 delay_after_find_match_ms = self.config.get("delay_after_find_match_ms", 5500)
                 await asyncio.sleep(delay_after_find_match_ms / 1000.0)  # Esperar carregar busca
@@ -493,12 +492,9 @@ class BotController:
                     await asyncio.sleep(2)
                     continue
                 
-                # 5. ATACAR - Em alguns layouts há 2 botões "Atacar!" em sequência.
-                # Então tocamos duas vezes (com um pequeno delay) para garantir que entra no ataque.
+                # 5. ATACAR - 1 tap no botão verde "Atacar!" (iniciar ataque)
                 self.current_step = "start_attack"
-                await send_log("info", "Iniciando ataque (2 cliques em Atacar!)...")
-                await _to_thread(self.adb.tap_percent, *self._coord("attack_start"))
-                await asyncio.sleep(1.2)
+                await send_log("info", "Iniciando ataque (1 clique em Atacar!)...")
                 await _to_thread(self.adb.tap_percent, *self._coord("attack_start"))
                 await asyncio.sleep(2)
 
