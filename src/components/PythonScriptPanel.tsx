@@ -633,7 +633,7 @@ class BotController:
                         break
 
                     slot_start_ts = time.time()
-                    slot_limit_s = float(self.config.get("deploy_slot_limit_s", 3))
+                    slot_limit_s = float(self.config.get("deploy_slot_limit_s", 6))
                     deploy_deadline_ts = deploy_start_ts + float(deploy_limit_s)
                     slot_deadline_ts = slot_start_ts + max(0.0, slot_limit_s)
 
