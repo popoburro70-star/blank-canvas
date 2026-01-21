@@ -827,32 +827,37 @@ class BotController:
                         y1 = int(h * 0.40)
                         x2 = int(w * 0.64)
                         y2 = int(h * 0.74)
-                        roi = np.array(img.crop((x1, y1, x2, y2)))
+                        roi = img.crop((x1, y1, x2, y2))
 
-                        gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
-                        gray = cv2.resize(gray, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
-                        gray = cv2.GaussianBlur(gray, (3, 3), 0)
-                        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                        # IMPORTANT: não use "lista de números" aqui.
+                        # Em alguns casos o OCR troca a ordem e o Elixir Negro acaba indo para o campo Elixir.
+                        # Para ficar estável, separamos o bloco em 3 faixas (ouro / elixir / elixir negro)
+                        # e fazemos OCR por faixa.
 
-                        txt = pytesseract.image_to_string(
-                            th,
-                            config="--psm 6 -c tessedit_char_whitelist=0123456789.,",
-                        )
+                        def _ocr_band(y_from: float, y_to: float) -> int:
+                            band = roi.crop((
+                                0,
+                                int(roi.size[1] * y_from),
+                                roi.size[0],
+                                int(roi.size[1] * y_to),
+                            ))
+                            arr = np.array(band)
+                            g = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+                            g = cv2.resize(g, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+                            g = cv2.GaussianBlur(g, (3, 3), 0)
+                            _, t = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                            txt = pytesseract.image_to_string(
+                                t,
+                                config="--psm 7 -c tessedit_char_whitelist=0123456789.,",
+                            )
+                            return _parse_number_any(txt)
 
-                        # Esperamos 3 linhas com números (ouro, elixir, elixir negro)
-                        lines = [ln.strip() for ln in (txt or "").splitlines() if ln.strip()]
-                        nums = [_parse_number_any(ln) for ln in lines]
-                        nums = [n for n in nums if n > 0]
+                        out = {
+                            "gold": _ocr_band(0.06, 0.36),
+                            "elixir": _ocr_band(0.36, 0.66),
+                            "dark_elixir": _ocr_band(0.66, 0.96),
+                        }
 
-                        # Melhor esforço: se vierem mais números, pegamos os 3 maiores *em ordem de aparição*.
-                        # (o bloco "Você ganhou" normalmente é a única coluna do crop)
-                        out = {"gold": 0, "elixir": 0, "dark_elixir": 0}
-                        if len(nums) >= 1:
-                            out["gold"] = nums[0]
-                        if len(nums) >= 2:
-                            out["elixir"] = nums[1]
-                        if len(nums) >= 3:
-                            out["dark_elixir"] = nums[2]
                         return out
 
                     try:
