@@ -405,11 +405,23 @@ class BotController:
                 found_target = False
                 search_attempts = 0
                 max_attempts = self.config.get("max_searches", 50)
+                search_start_ts = time.time()
+                force_attack_after_s = float(self.config.get("force_attack_after_s", 25))
                 
                 while not found_target and search_attempts < max_attempts and self.running:
                     if self.paused:
                         await asyncio.sleep(1)
                         continue
+
+                    # Fail-safe: se ficarmos tempo demais nessa etapa (OCR ruim / UI diferente),
+                    # forçamos o ataque para não travar após "Procurar partida".
+                    if (time.time() - search_start_ts) >= force_attack_after_s:
+                        await send_log(
+                            "warning",
+                            f"Tempo de busca excedeu {force_attack_after_s:.0f}s. Forçando ataque para prosseguir.",
+                        )
+                        found_target = True
+                        break
                         
                     self.current_step = "analyze_village"
                     search_attempts += 1
@@ -612,43 +624,46 @@ class BotController:
                     slot_limit_s = int(self.config.get("deploy_slot_limit_s", 10))
 
                     # Seleciona slot e tenta ler quantas tropas ainda existem.
-                    # Se OCR falhar (0), fazemos um "probe" (alguns taps) para não deixar
-                    # tropas sem deploy por causa de OCR instável.
+                    # Se OCR falhar (0), NÃO fazemos fallback infinito.
+                    # Apenas tentamos por até 'deploy_slot_limit_s' e então seguimos para o próximo slot.
                     await safe_tap_slot(slot)
                     await asyncio.sleep(0.22)
                     initial = await read_troop_count(slot)
 
+                    # Caso OCR venha 0, tentamos deploy por um curto período (até o limite do slot),
+                    # sem "probes" extras que possam causar repetição infinita na mesma tropa.
                     if initial <= 0:
-                        # OCR pode falhar em alguns emuladores (texto pequeno/blur).
-                        # Estratégia: sempre tentar um "dump" curto (não faz mal se estiver vazio),
-                        # e só então decidir se seguimos com OCR.
-                        await safe_tap_slot(slot)
-                        await asyncio.sleep(0.12)
-                        for (dx, dy) in deploy_plan:
-                            if not self.running:
+                        await send_log(
+                            "warning",
+                            f"Slot {slot}: OCR=0. Tentando deploy por até {slot_limit_s}s e seguindo.",
+                        )
+                        while self.running:
+                            if (time.time() - deploy_start_ts) >= deploy_limit_s:
                                 break
-                            await tap_many(dx, dy, 3, delay_s=0.03)
+                            if (time.time() - slot_start_ts) >= slot_limit_s:
+                                break
 
-                        await asyncio.sleep(0.18)
-                        probe_count = await read_troop_count(slot)
-
-                        # Se OCR continuar 0, ainda assim consideramos que pode haver tropas
-                        # (xN pode estar ilegível). Fazemos mais alguns pacotes e seguimos.
-                        if probe_count <= 0:
-                            await send_log("warning", f"Slot {slot}: OCR=0, fazendo deploy por tentativas (fallback)")
-                            for _ in range(2):
+                            await safe_tap_slot(slot)
+                            await asyncio.sleep(0.10)
+                            for (dx, dy) in deploy_plan:
                                 if not self.running:
                                     break
-                                await safe_tap_slot(slot)
-                                await asyncio.sleep(0.10)
-                                for (dx, dy) in deploy_plan:
-                                    if not self.running:
-                                        break
-                                    await tap_many(dx, dy, 8, delay_s=0.03)
-                                await asyncio.sleep(0.12)
-                            continue
+                                await tap_many(dx, dy, 6, delay_s=0.03)
 
-                        initial = probe_count
+                            # se o OCR começar a ler, voltamos ao modo controlado
+                            await asyncio.sleep(0.12)
+                            maybe_count = await read_troop_count(slot)
+                            if maybe_count > 0:
+                                initial = maybe_count
+                                break
+
+                        # Se continuou 0, simplesmente passa para o próximo slot
+                        if initial <= 0:
+                            await send_log(
+                                "warning",
+                                f"Slot {slot}: sem leitura OCR dentro do limite. Prosseguindo para o próximo slot.",
+                            )
+                            continue
 
                     await send_log("info", f"Slot {slot}: {initial} tropas detectadas (OCR)")
 
@@ -692,15 +707,9 @@ class BotController:
                         await asyncio.sleep(0.18)
                         new_count = await read_troop_count(slot)
 
-                        # Se OCR falhar (0) mas provavelmente ainda há tropas, tenta mais 1 pacote
+                        # Se OCR falhar (0), não ficamos presos: respeita o limite do slot.
                         if new_count == 0 and count > 0:
-                            unchanged_checks += 1
-                            if unchanged_checks >= 2:
-                                await send_log(
-                                    "warning",
-                                    f"Slot {slot}: OCR instável (0). Prosseguindo para o próximo slot.",
-                                )
-                                break
+                            # deixa o loop continuar até estourar 'slot_limit_s'
                             continue
 
                         count = new_count
