@@ -1014,13 +1014,22 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
     };
 
     const handleDownload = () => {
-      const blob = new Blob([PYTHON_SCRIPT], { type: 'text/plain' });
+      // Alguns navegadores/ambientes (ex.: Safari/WebView) não iniciam o download
+      // se o <a> não estiver no DOM ou se o ObjectURL for revogado imediatamente.
+      const blob = new Blob([PYTHON_SCRIPT], { type: 'text/x-python;charset=utf-8' });
       const url = URL.createObjectURL(blob);
+
       const a = document.createElement('a');
       a.href = url;
       a.download = 'coc_bot_controller.py';
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+
+      // Aguarda o tick do navegador antes de revogar.
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
     };
 
     return (
