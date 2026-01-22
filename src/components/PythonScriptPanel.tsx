@@ -1282,6 +1282,15 @@ if __name__ == "__main__":
 export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof Card>>(
   ({ className, ...props }, ref) => {
     const [copied, setCopied] = React.useState(false);
+    const [copiedLicenseUrl, setCopiedLicenseUrl] = React.useState(false);
+
+    const licenseValidateUrl = React.useMemo(() => {
+      // Monta automaticamente a URL do endpoint de validação do backend.
+      // (Não depende do domínio do site publicado, e funciona em preview/produção.)
+      const base = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined;
+      if (!base) return '';
+      return `${String(base).replace(/\/$/, '')}/functions/v1/validate-license`;
+    }, []);
 
      const normalizedScript = React.useMemo(() => {
        // Garante indentação consistente (múltiplos de 4 espaços) para evitar IndentationError.
@@ -1300,6 +1309,13 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
       await navigator.clipboard.writeText(normalizedScript);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleCopyLicenseUrl = async () => {
+      if (!licenseValidateUrl) return;
+      await navigator.clipboard.writeText(licenseValidateUrl);
+      setCopiedLicenseUrl(true);
+      setTimeout(() => setCopiedLicenseUrl(false), 2000);
     };
 
     const downloadBlob = React.useCallback((blob: Blob, filename: string) => {
@@ -1338,7 +1354,7 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
           '3) (Opcional) Configure o Tesseract via env:\n',
           '   set "TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe"\n',
           '4) Configure a URL de validação de licença:\n',
-          '   set "LICENSE_VALIDATE_URL=<URL_DO_BACKEND>/functions/v1/validate-license"\n',
+          `   set "LICENSE_VALIDATE_URL=${licenseValidateUrl || '<URL_DO_BACKEND>/functions/v1/validate-license'}"\n`,
           '5) Configure o segredo compartilhado:\n',
           '   set "LICENSE_SECRET=<SECRET_FROM_ADMIN>"\n',
           '6) Rode:\n',
@@ -1359,6 +1375,30 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
               SCRIPT PYTHON
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyLicenseUrl}
+                disabled={!licenseValidateUrl}
+                className="h-8 gap-1.5 text-xs"
+                title={
+                  licenseValidateUrl
+                    ? 'Copiar URL do endpoint validate-license'
+                    : 'URL não disponível (VITE_SUPABASE_URL ausente)'
+                }
+              >
+                {copiedLicenseUrl ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-success" />
+                    URL copiada!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copiar LICENSE_VALIDATE_URL
+                  </>
+                )}
+              </Button>
               <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs">
                 {copied ? (
                   <>
@@ -1393,10 +1433,20 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
             <div className="p-3 rounded-lg bg-secondary/30 border border-border">
               <h4 className="text-sm font-medium mb-2">Instruções:</h4>
               <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                <li>Instale as dependências: <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">py -m pip install websockets pillow pytesseract opencv-python numpy</code></li>
+                <li>Instale as dependências: <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">py -m pip install -r requirements.txt</code> (ou instale manualmente os pacotes do requirements).</li>
                 <li>Habilite ADB no BlueStacks: Configurações → Avançadas → Android Debug Bridge → ON</li>
                 <li>Abra o Clash of Clans no BlueStacks</li>
-                <li>Execute o script: <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">python coc_bot_controller.py</code></li>
+                <li>
+                  Configure a URL de licença (PowerShell):{' '}
+                  <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">
+                    $env:LICENSE_VALIDATE_URL=&quot;{licenseValidateUrl || '&lt;URL_DO_BACKEND&gt;/functions/v1/validate-license'}&quot;
+                  </code>
+                </li>
+                <li>
+                  Configure o segredo (PowerShell):{' '}
+                  <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">$env:LICENSE_SECRET=&quot;&lt;SECRET_FROM_ADMIN&gt;&quot;</code>
+                </li>
+                <li>Execute o script: <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">py coc_bot_controller.py</code></li>
                 <li>Clique em "Conectar ADB" no painel</li>
               </ol>
             </div>
