@@ -1,6 +1,6 @@
 import { Bot, Shield } from 'lucide-react';
 import * as React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { StatusIndicator } from './StatusIndicator';
 import { ConnectionStatusIndicator } from './ConnectionStatus';
 import { BotStatus } from '@/types/bot';
@@ -30,6 +30,7 @@ export function Header({
   onToggleRealADB
 }: HeaderProps) {
   const nav = useNavigate();
+  const location = useLocation();
   const { user } = useSession();
   const { isAdmin, loading: roleLoading, error: roleError } = useIsAdmin(user?.id);
 
@@ -81,6 +82,9 @@ export function Header({
           <div className="text-[11px] text-muted-foreground">
             Role: <span className="text-foreground">{roleLoading ? '…' : isAdmin ? 'admin' : 'user'}</span>
             {roleError ? <span className="text-destructive"> ({roleError})</span> : null}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Rota: <span className="text-foreground">{location.pathname}</span>
           </div>
         </div>
 
