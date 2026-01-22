@@ -75,6 +75,7 @@ ADB_DEVICE = "emulator-5554"  # Ou use "127.0.0.1:5555" para conexão TCP
  # URL do endpoint de validação (configure via variável de ambiente)
  # Exemplo: https://<backend-url>/functions/v1/validate-license
  LICENSE_VALIDATE_URL = os.environ.get("LICENSE_VALIDATE_URL", "").strip()
+ LICENSE_SECRET = os.environ.get("LICENSE_SECRET", "").strip()
 
  def get_machine_fingerprint() -> str:
      """Gera um identificador estável do computador (HWID-ish).
@@ -122,14 +123,30 @@ ADB_DEVICE = "emulator-5554"  # Ou use "127.0.0.1:5555" para conexão TCP
          print("[LIC] Defina LICENSE_VALIDATE_URL apontando para o endpoint validate-license.")
          sys.exit(2)
 
+     if not LICENSE_SECRET:
+         print("[LIC] ERRO: variável de ambiente LICENSE_SECRET não configurada.")
+         print("[LIC] Defina LICENSE_SECRET com o segredo compartilhado para autenticação.")
+         sys.exit(2)
+
      username = input("Usuário: ").strip()
      license_key = getpass.getpass("License key: ").strip()
      hwid = get_machine_fingerprint()
 
+     # Generate HMAC signature for authentication
+     timestamp_ms = int(time.time() * 1000)
+     payload_str = f"{username}|{license_key}|{hwid}|{timestamp_ms}"
+     signature = hashlib.sha256(f"{LICENSE_SECRET}:{payload_str}".encode("utf-8")).hexdigest()
+
      try:
          resp = requests.post(
              LICENSE_VALIDATE_URL,
-             json={"username": username, "license_key": license_key, "hwid": hwid},
+             json={
+                 "username": username,
+                 "license_key": license_key,
+                 "hwid": hwid,
+                 "signature": signature,
+                 "timestamp": timestamp_ms,
+             },
              timeout=12,
          )
          data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
@@ -1322,7 +1339,9 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
           '   set "TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe"\n',
           '4) Configure a URL de validação de licença:\n',
           '   set "LICENSE_VALIDATE_URL=<URL_DO_BACKEND>/functions/v1/validate-license"\n',
-          '5) Rode:\n',
+          '5) Configure o segredo compartilhado:\n',
+          '   set "LICENSE_SECRET=<SECRET_FROM_ADMIN>"\n',
+          '6) Rode:\n',
           '   py coc_bot_controller.py\n',
         ].join('')
       );
