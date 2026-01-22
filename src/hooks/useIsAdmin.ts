@@ -11,7 +11,9 @@ export function useIsAdmin(userId?: string) {
     async function run() {
       if (!userId) {
         setIsAdmin(false);
-        setLoading(false);
+        // Mantém "loading" true para evitar redirects prematuros em rotas protegidas
+        // enquanto a sessão ainda está inicializando.
+        setLoading(true);
         setError(null);
         return;
       }
