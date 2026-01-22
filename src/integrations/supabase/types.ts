@@ -14,7 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      license_activations: {
+        Row: {
+          created_at: string
+          hwid_hash: string
+          id: string
+          last_ip: string | null
+          last_seen_at: string
+          license_key_id: string
+          license_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hwid_hash: string
+          id?: string
+          last_ip?: string | null
+          last_seen_at?: string
+          license_key_id: string
+          license_user_id: string
+        }
+        Update: {
+          created_at?: string
+          hwid_hash?: string
+          id?: string
+          last_ip?: string | null
+          last_seen_at?: string
+          license_key_id?: string
+          license_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_activations_license_key_id_fkey"
+            columns: ["license_key_id"]
+            isOneToOne: false
+            referencedRelation: "license_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "license_activations_license_user_id_fkey"
+            columns: ["license_user_id"]
+            isOneToOne: false
+            referencedRelation: "license_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      license_keys: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          first_activated_at: string | null
+          id: string
+          key_hash: string
+          max_activations: number
+          note: string | null
+          revoked_at: string | null
+          valid_days: number
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          first_activated_at?: string | null
+          id?: string
+          key_hash: string
+          max_activations?: number
+          note?: string | null
+          revoked_at?: string | null
+          valid_days?: number
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          first_activated_at?: string | null
+          id?: string
+          key_hash?: string
+          max_activations?: number
+          note?: string | null
+          revoked_at?: string | null
+          valid_days?: number
+        }
+        Relationships: []
+      }
+      license_users: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
