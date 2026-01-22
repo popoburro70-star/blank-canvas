@@ -96,8 +96,11 @@ export function KeyManager() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Key</TableHead>
+              <TableHead>ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Dias</TableHead>
+              <TableHead>Ativações</TableHead>
               <TableHead>Ativada em</TableHead>
               <TableHead>Expira em</TableHead>
               <TableHead>Nota</TableHead>
@@ -107,19 +110,25 @@ export function KeyManager() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">Carregando…</TableCell>
+                <TableCell colSpan={8} className="text-muted-foreground">Carregando…</TableCell>
               </TableRow>
             ) : keys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">Nenhuma key.</TableCell>
+                <TableCell colSpan={8} className="text-muted-foreground">Nenhuma key.</TableCell>
               </TableRow>
             ) : (
               keys.map((k) => {
                 const status = k.revoked_at ? "Revogada" : k.expires_at && new Date(k.expires_at).getTime() < Date.now() ? "Expirada" : "Ativa";
                 return (
                   <TableRow key={k.id}>
+                    <TableCell className="text-muted-foreground">
+                      {/* Por segurança, o backend NÃO armazena a key em texto. Só é exibida no momento da criação. */}
+                      —
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{k.id.slice(0, 8)}…</TableCell>
                     <TableCell className="font-medium">{status}</TableCell>
                     <TableCell className="text-muted-foreground">{k.valid_days}</TableCell>
+                    <TableCell className="text-muted-foreground">{k.max_activations}</TableCell>
                     <TableCell className="text-muted-foreground">{fmt(k.first_activated_at)}</TableCell>
                     <TableCell className="text-muted-foreground">{fmt(k.expires_at)}</TableCell>
                     <TableCell className="text-muted-foreground">{k.note ?? "—"}</TableCell>
