@@ -1406,12 +1406,19 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
           '   py -m pip install -r requirements.txt\n',
           '3) (Opcional) Configure o Tesseract via env:\n',
           '   set "TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe"\n',
-          '4) Configure a URL de validação de licença:\n',
+          '4) Configure as variáveis de LICENÇA (ANTES de rodar o script):\n',
+          '   --- PowerShell (recomendado) ---\n',
+          `   $env:LICENSE_VALIDATE_URL="${licenseValidateUrl || '<URL_DO_BACKEND>/functions/v1/validate-license'}"\n`,
+          '   $env:LICENSE_SECRET="<SECRET_FROM_ADMIN>"\n',
+          '   --- CMD (Prompt de comando) ---\n',
           `   set "LICENSE_VALIDATE_URL=${licenseValidateUrl || '<URL_DO_BACKEND>/functions/v1/validate-license'}"\n`,
-          '5) Configure o segredo compartilhado:\n',
           '   set "LICENSE_SECRET=<SECRET_FROM_ADMIN>"\n',
-          '6) Rode:\n',
+          '5) Rode:\n',
           '   py coc_bot_controller.py\n',
+          '\n',
+          'Onde conseguir os valores:\n',
+          '- LICENSE_VALIDATE_URL: no painel web (aba SCRIPT) clique em "Copiar LICENSE_VALIDATE_URL".\n',
+          '- LICENSE_SECRET: é o mesmo valor do secret do backend chamado VALIDATE_LICENSE_SHARED_SECRET (admin).\n',
         ].join('')
       );
 
@@ -1547,6 +1554,11 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
                 <li>
                   Configure o segredo (PowerShell):{' '}
                   <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">$env:LICENSE_SECRET=&quot;&lt;SECRET_FROM_ADMIN&gt;&quot;</code>
+                </li>
+                <li className="text-muted-foreground">
+                  <span className="font-medium text-foreground">CMD (alternativa)</span>:{' '}
+                  <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">set &quot;LICENSE_VALIDATE_URL={licenseValidateUrl || '&lt;URL_DO_BACKEND&gt;/functions/v1/validate-license'}&quot;</code>{' '}
+                  e <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">set &quot;LICENSE_SECRET=&lt;SECRET_FROM_ADMIN&gt;&quot;</code>
                 </li>
                 <li>Execute o script: <code className="px-1.5 py-0.5 rounded bg-secondary text-foreground">py coc_bot_controller.py</code></li>
                 <li>Clique em "Conectar ADB" no painel</li>
