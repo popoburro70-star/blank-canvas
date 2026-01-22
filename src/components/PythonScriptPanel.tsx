@@ -10,6 +10,7 @@ pillow
 pytesseract
 opencv-python
 numpy
+requests
 `;
 const PYTHON_SCRIPT = `#!/usr/bin/env python3
 """
@@ -18,7 +19,7 @@ Este script se comunica com o painel web via WebSocket e executa comandos ADB no
 
 Requisitos:
 - Python 3.8+
-- py -m pip install websockets pillow pytesseract opencv-python numpy
+ - py -m pip install websockets pillow pytesseract opencv-python numpy requests
 - ADB instalado e no PATH
 - BlueStacks rodando com ADB habilitado (Configurações > Avançadas > Habilitar Android Debug Bridge)
 """
@@ -31,9 +32,13 @@ import base64
 import io
 import os
 import sys
+ import hashlib
+ import platform
+ import getpass
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 import websockets
+ import requests
 from PIL import Image
 import pytesseract
 import cv2
@@ -66,6 +71,84 @@ print(f"[OCR] Usando Tesseract: {pytesseract.pytesseract.tesseract_cmd}")
 # Configurações
 WS_PORT = 8765
 ADB_DEVICE = "emulator-5554"  # Ou use "127.0.0.1:5555" para conexão TCP
+
+ # URL do endpoint de validação (configure via variável de ambiente)
+ # Exemplo: https://<backend-url>/functions/v1/validate-license
+ LICENSE_VALIDATE_URL = os.environ.get("LICENSE_VALIDATE_URL", "").strip()
+
+ def get_machine_fingerprint() -> str:
+     """Gera um identificador estável do computador (HWID-ish).
+     - Windows: tenta ler MachineGuid do Registro
+     - Linux: /etc/machine-id
+     - Fallback: informações de plataforma
+     """
+     parts = []
+     try:
+         if sys.platform == "win32":
+             import winreg  # type: ignore
+             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\\Microsoft\\Cryptography")
+             guid, _ = winreg.QueryValueEx(key, "MachineGuid")
+             parts.append(str(guid))
+         else:
+             for p in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+                 if os.path.isfile(p):
+                     with open(p, "r", encoding="utf-8") as f:
+                         parts.append(f.read().strip())
+                     break
+     except Exception:
+         pass
+
+     # Fallback/extra entropy
+     parts.extend([
+         platform.system(),
+         platform.release(),
+         platform.machine(),
+         platform.node(),
+     ])
+     return "|".join([p for p in parts if p])
+
+ def sha256_hex(s: str) -> str:
+     return hashlib.sha256(s.encode("utf-8", errors="ignore")).hexdigest()
+
+ def validate_license_or_exit():
+     print()
+     print("=" * 50)
+     print("  Validação de Licença")
+     print("=" * 50)
+     print()
+
+     if not LICENSE_VALIDATE_URL:
+         print("[LIC] ERRO: variável de ambiente LICENSE_VALIDATE_URL não configurada.")
+         print("[LIC] Defina LICENSE_VALIDATE_URL apontando para o endpoint validate-license.")
+         sys.exit(2)
+
+     username = input("Usuário: ").strip()
+     license_key = getpass.getpass("License key: ").strip()
+     hwid = get_machine_fingerprint()
+
+     try:
+         resp = requests.post(
+             LICENSE_VALIDATE_URL,
+             json={"username": username, "license_key": license_key, "hwid": hwid},
+             timeout=12,
+         )
+         data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+     except Exception as e:
+         print(f"[LIC] ERRO ao validar licença: {e}")
+         sys.exit(2)
+
+     if not data.get("ok"):
+         status = data.get("status", "invalid")
+         print(f"[LIC] Licença inválida: {status}")
+         if data.get("expires_at"):
+             print(f"[LIC] Expira em: {data.get('expires_at')}")
+         # Não imprime key/hwid por segurança
+         sys.exit(3)
+
+     print("[LIC] Licença OK")
+     if data.get("expires_at"):
+         print(f"[LIC] Expira em: {data.get('expires_at')}")
+     print(f"[LIC] HWID hash: {sha256_hex(hwid)[:12]}... (debug)")
 
 def find_adb() -> str:
     """Encontra o executável do ADB"""
@@ -1174,6 +1257,7 @@ class WebSocketServer:
 
 
 if __name__ == "__main__":
+    validate_license_or_exit()
     server = WebSocketServer()
     asyncio.run(server.start())
 `;
@@ -1236,7 +1320,9 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
           '   py -m pip install -r requirements.txt\n',
           '3) (Opcional) Configure o Tesseract via env:\n',
           '   set "TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe"\n',
-          '4) Rode:\n',
+          '4) Configure a URL de validação de licença:\n',
+          '   set "LICENSE_VALIDATE_URL=<URL_DO_BACKEND>/functions/v1/validate-license"\n',
+          '5) Rode:\n',
           '   py coc_bot_controller.py\n',
         ].join('')
       );
