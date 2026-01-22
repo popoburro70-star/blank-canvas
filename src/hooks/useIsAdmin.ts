@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function useIsAdmin(userId?: string) {
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -11,6 +12,7 @@ export function useIsAdmin(userId?: string) {
       if (!userId) {
         setIsAdmin(false);
         setLoading(false);
+        setError(null);
         return;
       }
       setLoading(true);
@@ -25,10 +27,12 @@ export function useIsAdmin(userId?: string) {
       if (error) {
         setIsAdmin(false);
         setLoading(false);
+        setError(error.message);
         return;
       }
       setIsAdmin(Boolean(data));
       setLoading(false);
+      setError(null);
     }
     run();
     return () => {
@@ -36,5 +40,5 @@ export function useIsAdmin(userId?: string) {
     };
   }, [userId]);
 
-  return { isAdmin, loading };
+  return { isAdmin, loading, error };
 }

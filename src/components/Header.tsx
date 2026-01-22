@@ -31,7 +31,7 @@ export function Header({
 }: HeaderProps) {
   const nav = useNavigate();
   const { user } = useSession();
-  const { isAdmin } = useIsAdmin(user?.id);
+  const { isAdmin, loading: roleLoading, error: roleError } = useIsAdmin(user?.id);
 
   const onLogout = React.useCallback(async () => {
     await supabase.auth.signOut();
@@ -72,6 +72,16 @@ export function Header({
               </Button>
             </>
           )}
+        </div>
+
+        <div className="hidden lg:flex flex-col items-end leading-tight">
+          <div className="text-xs text-muted-foreground">
+            Logado como: <span className="text-foreground">{user?.email ?? '—'}</span>
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Role: <span className="text-foreground">{roleLoading ? '…' : isAdmin ? 'admin' : 'user'}</span>
+            {roleError ? <span className="text-destructive"> ({roleError})</span> : null}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 border border-border">
