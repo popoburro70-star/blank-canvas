@@ -32,8 +32,17 @@ export type LicenseActivation = {
 };
 
 async function invoke<T>(action: string, payload?: Record<string, unknown>) {
+  // Importante: se não houver sessão, o Supabase JS pode acabar enviando o ANON JWT,
+  // que não possui `sub` e causa `invalid_token` no backend.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("not_authenticated");
+
   const { data, error } = await supabase.functions.invoke("admin-license", {
     body: { action, payload },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
   if (error) throw error;
   const parsed = AdminResponseSchema.safeParse(data);
