@@ -2,6 +2,7 @@
 // Public endpoint (verify_jwt=false) intended for desktop/python client validation.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { z } from "npm:zod@3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,11 +24,71 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 10;
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(clientId);
+
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(clientId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
+const RequestSchema = z.object({
+  username: z.string().trim().min(1).max(64),
+  license_key: z.string().trim().min(1).max(128),
+  hwid: z.string().trim().min(1).max(256),
+  signature: z.string().trim().min(1).max(128),
+  timestamp: z.number().int().positive(),
+});
+
+async function verifySignature(
+  username: string,
+  licenseKey: string,
+  hwid: string,
+  timestamp: number,
+  signature: string,
+): Promise<boolean> {
+  const secret = Deno.env.get("VALIDATE_LICENSE_SHARED_SECRET");
+  if (!secret) {
+    console.error("VALIDATE_LICENSE_SHARED_SECRET not configured");
+    return false;
+  }
+
+  // Reject stale requests (> 5 minutes old)
+  const now = Date.now();
+  if (Math.abs(now - timestamp) > 5 * 60 * 1000) {
+    return false;
+  }
+
+  const payload = `${username}|${licenseKey}|${hwid}|${timestamp}`;
+  const expectedSig = await sha256Hex(`${secret}:${payload}`);
+  return signature === expectedSig;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
 
   try {
+    const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "unknown";
+
+    if (!checkRateLimit(ip)) {
+      console.warn(`[RATE_LIMIT] IP ${ip} exceeded limit`);
+      return json({ ok: false, status: "rate_limit" }, 429);
+    }
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -40,20 +101,18 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? null;
-
-    const body = await req.json().catch(() => null) as null | {
-      username?: string;
-      license_key?: string;
-      hwid?: string;
-    };
-
-    const username = (body?.username ?? "").trim();
-    const licenseKey = (body?.license_key ?? "").trim();
-    const hwid = (body?.hwid ?? "").trim();
-
-    if (!username || !licenseKey || !hwid) {
+    const parsed = RequestSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      console.warn("[VALIDATION] Invalid request schema", parsed.error);
       return json({ ok: false, status: "invalid_input" }, 400);
+    }
+
+    const { username, license_key: licenseKey, hwid, signature, timestamp } = parsed.data;
+
+    const sigValid = await verifySignature(username, licenseKey, hwid, timestamp, signature);
+    if (!sigValid) {
+      console.warn(`[AUTH] Invalid signature for user=${username}, ip=${ip}`);
+      return json({ ok: false, status: "unauthorized" }, 403);
     }
 
     const [keyHash, hwidHash] = await Promise.all([
