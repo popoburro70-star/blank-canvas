@@ -2,3 +2,6 @@ project_id = "dvpyzdhqawdkyduzfebm"
 
 [functions.validate-license]
 verify_jwt = false
+
+[functions.admin-license]
+verify_jwt = false
