@@ -750,18 +750,11 @@ class BotController:
                         img = Image.open(io.BytesIO(shot)).convert("RGB")
                         w, h = img.size
 
-                        # Debug opcional: salva o screenshot completo para calibrar ROI
-                        # (ajuda MUITO quando o OCR volta vazio porque o recorte não pegou o texto).
+                        # Debug: se o OCR der 0, vamos salvar automaticamente imagens de referência.
+                        # Isso é essencial para ajustar ROI quando o recorte não pega o painel "Você ganhou".
                         debug_dir = ""
                         ts = int(time.time() * 1000)
-                        if victory_ocr_debug:
-                            try:
-                                debug_dir = os.path.join(os.getcwd(), "debug_victory")
-                                os.makedirs(debug_dir, exist_ok=True)
-                                full_path = os.path.join(debug_dir, f"victory_full_{ts}.png")
-                                img.save(full_path)
-                            except Exception:
-                                debug_dir = ""
+                        debug_enabled = victory_ocr_debug  # pode virar True automaticamente quando OCR=0
 
                         # Tentativas de ROI (alguns emuladores mudam muito o layout/escala)
                         roi_presets = [
@@ -769,6 +762,8 @@ class BotController:
                             (0.34, 0.40, 0.64, 0.74),
                             # mais amplo (tende a funcionar melhor em escalas diferentes)
                             (0.28, 0.36, 0.72, 0.80),
+                            # super amplo (último recurso quando a UI está deslocada/zoom diferente)
+                            (0.18, 0.28, 0.84, 0.88),
                         ]
 
                         # IMPORTANT: não use "lista de números" aqui.
@@ -793,6 +788,9 @@ class BotController:
                                 t,
                                 config="--psm 6 -c tessedit_char_whitelist=0123456789.,",
                             )
+                            # fallback dentro da faixa: às vezes a whitelist/psm mata tudo
+                            if not (txt or "").strip():
+                                txt = pytesseract.image_to_string(t, config="--psm 7")
                             return _parse_number_any(txt), txt
 
                         best = {"gold": 0, "elixir": 0, "dark_elixir": 0}
@@ -802,13 +800,6 @@ class BotController:
                         # roda combinações (ROI preset x invert) até achar algo plausível
                         for (rx1, ry1, rx2, ry2) in roi_presets:
                             roi = img.crop((int(w * rx1), int(h * ry1), int(w * rx2), int(h * ry2)))
-
-                            if victory_ocr_debug and debug_dir:
-                                try:
-                                    roi_path = os.path.join(debug_dir, f"victory_roi_{int(rx1*100)}_{int(ry1*100)}_{int(rx2*100)}_{int(ry2*100)}_{ts}.png")
-                                    roi.save(roi_path)
-                                except Exception:
-                                    pass
 
                             for invert in (False, True):
                                 g, raw_g = _ocr_band(roi, 0.06, 0.36, invert)
@@ -822,6 +813,28 @@ class BotController:
                                 # early exit se já temos algo bom
                                 if s >= 5000:
                                     return best, best_raw
+
+                        # Se ainda está 0, ativa debug automaticamente e salva imagens para inspeção
+                        if best_sum == 0:
+                            debug_enabled = True
+                            try:
+                                debug_dir = os.path.join(os.getcwd(), "debug_victory")
+                                os.makedirs(debug_dir, exist_ok=True)
+                                full_path = os.path.join(debug_dir, f"victory_full_{ts}.png")
+                                img.save(full_path)
+                                # salva ROIs testados
+                                for (rx1, ry1, rx2, ry2) in roi_presets:
+                                    try:
+                                        roi = img.crop((int(w * rx1), int(h * ry1), int(w * rx2), int(h * ry2)))
+                                        roi_path = os.path.join(
+                                            debug_dir,
+                                            f"victory_roi_{int(rx1*100)}_{int(ry1*100)}_{int(rx2*100)}_{int(ry2*100)}_{ts}.png",
+                                        )
+                                        roi.save(roi_path)
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                debug_dir = ""
 
                         # Fallback extra: se veio TUDO vazio, tenta um OCR mais permissivo no ROI mais amplo.
                         # (sem whitelist e com outro psm) — às vezes o jogo usa fonte/anti-alias que o Otsu perde.
@@ -875,7 +888,7 @@ class BotController:
                                 break
                             await asyncio.sleep(0.4)  # micro atraso para o painel estabilizar
 
-                        if victory_ocr_debug or (
+                        if debug_enabled or (
                             best_loot.get("gold", 0) == 0
                             and best_loot.get("elixir", 0) == 0
                             and best_loot.get("dark_elixir", 0) == 0
@@ -883,6 +896,8 @@ class BotController:
                             await send_log("info", f"[DEBUG] OCR vitória raw gold: {best_raw.get('gold','').strip()}")
                             await send_log("info", f"[DEBUG] OCR vitória raw elixir: {best_raw.get('elixir','').strip()}")
                             await send_log("info", f"[DEBUG] OCR vitória raw DE: {best_raw.get('dark_elixir','').strip()}")
+                            if debug_dir:
+                                await send_log("info", f"[DEBUG] Imagens de debug salvas em: {debug_dir}")
 
                         return best_loot
                     except Exception:
