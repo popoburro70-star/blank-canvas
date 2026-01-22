@@ -137,7 +137,9 @@ ADB_DEVICE = "emulator-5554"  # Ou use "127.0.0.1:5555" para conexão TCP
          sys.exit(2)
 
      username = input("Usuário: ").strip()
-     license_key = getpass.getpass("License key: ").strip()
+     # Em alguns terminais (ex.: PowerShell), getpass pode parecer que "não deixa digitar"
+     # porque não ecoa nada na tela. Para evitar confusão, usamos input() (visível).
+     license_key = input("License key: ").strip()
      hwid = get_machine_fingerprint()
 
      # Generate HMAC signature for authentication
