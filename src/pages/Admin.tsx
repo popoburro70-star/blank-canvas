@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserManager } from "@/components/admin/UserManager";
 import { KeyManager } from "@/components/admin/KeyManager";
+import { ActivationsViewer } from "@/components/admin/ActivationsViewer";
 
 export default function AdminPage() {
   const nav = useNavigate();
@@ -67,12 +68,16 @@ export default function AdminPage() {
               <TabsList>
                 <TabsTrigger value="users">Usuários</TabsTrigger>
                 <TabsTrigger value="keys">Keys</TabsTrigger>
+                <TabsTrigger value="activations">Ativações</TabsTrigger>
               </TabsList>
               <TabsContent value="users" className="mt-4">
                 <UserManager />
               </TabsContent>
               <TabsContent value="keys" className="mt-4">
                 <KeyManager />
+              </TabsContent>
+              <TabsContent value="activations" className="mt-4">
+                <ActivationsViewer />
               </TabsContent>
             </Tabs>
           </CardContent>

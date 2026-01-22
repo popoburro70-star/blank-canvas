@@ -21,6 +21,16 @@ export type LicenseKey = {
   created_at: string;
 };
 
+export type LicenseActivation = {
+  id: string;
+  license_key_id: string;
+  license_user_id: string;
+  username: string | null;
+  hwid_hash: string;
+  last_seen_at: string;
+  created_at: string;
+};
+
 async function invoke<T>(action: string, payload?: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke("admin-license", {
     body: { action, payload },
@@ -58,5 +68,13 @@ export const adminLicenseApi = {
   revokeKey: async (id: string) => {
     const res = await invoke<{ ok: true; key: LicenseKey }>("revoke_key", { id });
     return res.key;
+  },
+
+  listActivations: async (params?: { username?: string; key?: string }) => {
+    const res = await invoke<{ ok: true; activations: LicenseActivation[] }>("list_activations", {
+      username: params?.username?.trim() || undefined,
+      key: params?.key?.trim() || undefined,
+    });
+    return res.activations;
   },
 };

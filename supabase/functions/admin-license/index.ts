@@ -41,6 +41,7 @@ const RequestSchema = z.object({
     "list_keys",
     "create_key",
     "revoke_key",
+    "list_activations",
   ]),
   payload: z.record(z.unknown()).optional(),
 });
@@ -210,6 +211,53 @@ Deno.serve(async (req) => {
       }
       if (!data) return json({ ok: false, error: "not_found" }, 404);
       return json({ ok: true, key: data });
+    }
+
+    if (action === "list_activations") {
+      const username = z.string().trim().max(64).optional().safeParse(payload?.username);
+      const key = z.string().trim().max(64).optional().safeParse(payload?.key);
+      if (!username.success || !key.success) return json({ ok: false, error: "invalid_input" }, 400);
+
+      const maybeUuid = (v?: string) => {
+        if (!v) return null;
+        const parsed = z.string().uuid().safeParse(v);
+        return parsed.success ? parsed.data : null;
+      };
+
+      let q = admin
+        .from("license_activations")
+        .select(
+          "id, hwid_hash, last_seen_at, created_at, license_key_id, license_user_id, license_users(username), license_keys(id)",
+        )
+        .order("last_seen_at", { ascending: false })
+        .limit(200);
+
+      if (username.data) {
+        q = q.ilike("license_users.username", `%${username.data}%`);
+      }
+
+      const keyUuid = maybeUuid(key.data);
+      if (keyUuid) {
+        q = q.eq("license_key_id", keyUuid);
+      }
+
+      const { data, error } = await q;
+      if (error) {
+        console.error("list_activations error", error);
+        return json({ ok: false, error: "db_error" }, 500);
+      }
+
+      const rows = (data ?? []).map((r: any) => ({
+        id: r.id,
+        hwid_hash: r.hwid_hash,
+        last_seen_at: r.last_seen_at,
+        created_at: r.created_at,
+        license_key_id: r.license_key_id,
+        license_user_id: r.license_user_id,
+        username: r.license_users?.username ?? null,
+      }));
+
+      return json({ ok: true, activations: rows });
     }
 
     return json({ ok: false, error: "unknown_action" }, 400);
