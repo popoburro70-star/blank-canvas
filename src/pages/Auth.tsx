@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,13 +24,16 @@ type AuthValues = z.infer<typeof AuthSchema>;
 export default function AuthPage() {
   const nav = useNavigate();
   const { user, loading } = useSession();
+  const { isAdmin, loading: roleLoading } = useIsAdmin(user?.id);
 
   const loginForm = useForm<AuthValues>({ resolver: zodResolver(AuthSchema), defaultValues: { email: "", password: "" } });
   const signupForm = useForm<AuthValues>({ resolver: zodResolver(AuthSchema), defaultValues: { email: "", password: "" } });
 
   React.useEffect(() => {
-    if (!loading && user) nav("/", { replace: true });
-  }, [loading, user, nav]);
+    if (loading || roleLoading) return;
+    if (!user) return;
+    nav(isAdmin ? "/admin" : "/", { replace: true });
+  }, [loading, roleLoading, user, isAdmin, nav]);
 
   const onLogin = async (v: AuthValues) => {
     const { error } = await supabase.auth.signInWithPassword({ email: v.email, password: v.password });

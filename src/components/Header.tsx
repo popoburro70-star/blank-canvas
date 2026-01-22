@@ -1,10 +1,16 @@
 import { Bot, Shield } from 'lucide-react';
+import * as React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { StatusIndicator } from './StatusIndicator';
 import { ConnectionStatusIndicator } from './ConnectionStatus';
 import { BotStatus } from '@/types/bot';
 import { ConnectionStatus } from '@/hooks/useWebSocketADB';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useSession } from '@/hooks/useSession';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface HeaderProps {
   status: BotStatus;
@@ -23,6 +29,15 @@ export function Header({
   useRealADB,
   onToggleRealADB
 }: HeaderProps) {
+  const nav = useNavigate();
+  const { user } = useSession();
+  const { isAdmin } = useIsAdmin(user?.id);
+
+  const onLogout = React.useCallback(async () => {
+    await supabase.auth.signOut();
+    nav('/', { replace: true });
+  }, [nav]);
+
   return (
     <header className="flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur-sm">
       <div className="flex items-center gap-4">
@@ -40,6 +55,25 @@ export function Header({
       </div>
       
       <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          {!user ? (
+            <Button variant="outline" size="sm" asChild className="h-8">
+              <Link to="/auth">Entrar</Link>
+            </Button>
+          ) : (
+            <>
+              {isAdmin && (
+                <Button variant="outline" size="sm" asChild className="h-8">
+                  <Link to="/admin">Admin</Link>
+                </Button>
+              )}
+              <Button variant="secondary" size="sm" onClick={onLogout} className="h-8">
+                Sair
+              </Button>
+            </>
+          )}
+        </div>
+
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 border border-border">
           <Label htmlFor="real-adb" className="text-xs text-muted-foreground cursor-pointer">
             Modo Real
