@@ -722,11 +722,21 @@ class BotController:
                     import re
                     if not s:
                         return 0
-                    # mantém apenas dígitos e separadores comuns
-                    cleaned = re.sub(r"[^0-9.,]", "", s)
-                    if not cleaned:
-                        return 0
-                    return int(cleaned.replace(".", "").replace(",", ""))
+                    # IMPORTANTE:
+                    # O OCR às vezes retorna MAIS DE UM número na mesma faixa (ex.: quebra de linha
+                    # ou ruído que captura parte da linha de baixo). Se simplesmente "limpar" tudo,
+                    # acabamos concatenando (ex.: 498.555 + 18.983 => 498.555.18.983).
+                    # Então extraímos *tokens numéricos* e pegamos o maior (mais plausível).
+                    tokens = re.findall(r"\d{1,3}(?:[\s\u00A0\.,]\d{3})*|\d+", s)
+                    best = 0
+                    for t in tokens:
+                        try:
+                            v = int(t.replace(" ", "").replace("\u00A0", "").replace(".", "").replace(",", ""))
+                            if v > best:
+                                best = v
+                        except Exception:
+                            pass
+                    return best
 
                 async def read_victory_loot() -> Dict[str, int]:
                     victory_ocr_retries = int(self.config.get("victory_ocr_retries", 3))
