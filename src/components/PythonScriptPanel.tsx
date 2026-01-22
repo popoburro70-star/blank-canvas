@@ -3,6 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Check, Terminal, Download } from 'lucide-react';
+import JSZip from 'jszip';
+
+const REQUIREMENTS_TXT = `websockets
+pillow
+pytesseract
+opencv-python
+numpy
+`;
 const PYTHON_SCRIPT = `#!/usr/bin/env python3
 """
 COC Farm Bot - ADB Controller
@@ -1193,15 +1201,14 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
       setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleDownload = () => {
+    const downloadBlob = React.useCallback((blob: Blob, filename: string) => {
       // Alguns navegadores/ambientes (ex.: Safari/WebView) não iniciam o download
       // se o <a> não estiver no DOM ou se o ObjectURL for revogado imediatamente.
-      const blob = new Blob([normalizedScript], { type: 'text/x-python;charset=utf-8' });
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'coc_bot_controller.py';
+      a.download = filename;
       a.rel = 'noopener';
       a.style.display = 'none';
       document.body.appendChild(a);
@@ -1210,6 +1217,32 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
 
       // Aguarda o tick do navegador antes de revogar.
       window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }, []);
+
+    const handleDownload = () => {
+      const blob = new Blob([normalizedScript], { type: 'text/x-python;charset=utf-8' });
+      downloadBlob(blob, 'coc_bot_controller.py');
+    };
+
+    const handleDownloadWithDeps = async () => {
+      const zip = new JSZip();
+      zip.file('coc_bot_controller.py', normalizedScript);
+      zip.file('requirements.txt', REQUIREMENTS_TXT);
+      zip.file(
+        'README_SETUP.txt',
+        [
+          '1) Instale Python 3.8+\n',
+          '2) Instale dependências:\n',
+          '   py -m pip install -r requirements.txt\n',
+          '3) (Opcional) Configure o Tesseract via env:\n',
+          '   set "TESSERACT_CMD=C:\\Program Files\\Tesseract-OCR\\tesseract.exe"\n',
+          '4) Rode:\n',
+          '   py coc_bot_controller.py\n',
+        ].join('')
+      );
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(blob, 'coc_bot_controller_bundle.zip');
     };
 
     return (
@@ -1237,6 +1270,15 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
               <Button variant="outline" size="sm" onClick={handleDownload} className="h-8 gap-1.5 text-xs">
                 <Download className="w-3.5 h-3.5" />
                 Download
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadWithDeps}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download + deps
               </Button>
             </div>
           </CardTitle>
