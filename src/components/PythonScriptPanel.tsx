@@ -1,9 +1,14 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Check, Terminal, Download } from 'lucide-react';
 import JSZip from 'jszip';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const REQUIREMENTS_TXT = `websockets
 pillow
@@ -1283,6 +1288,10 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
   ({ className, ...props }, ref) => {
     const [copied, setCopied] = React.useState(false);
     const [copiedLicenseUrl, setCopiedLicenseUrl] = React.useState(false);
+    const [licenseTestOpen, setLicenseTestOpen] = React.useState(false);
+    const [licenseTestLoading, setLicenseTestLoading] = React.useState(false);
+    const [testUsername, setTestUsername] = React.useState('');
+    const [testLicenseKey, setTestLicenseKey] = React.useState('');
 
     const licenseValidateUrl = React.useMemo(() => {
       // Monta automaticamente a URL do endpoint de validação do backend.
@@ -1316,6 +1325,50 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
       await navigator.clipboard.writeText(licenseValidateUrl);
       setCopiedLicenseUrl(true);
       setTimeout(() => setCopiedLicenseUrl(false), 2000);
+    };
+
+    const handleTestLicense = async () => {
+      const username = testUsername.trim();
+      const licenseKey = testLicenseKey.trim();
+      if (!username || !licenseKey) {
+        toast({ title: 'Preencha usuário e license key', variant: 'destructive' });
+        return;
+      }
+
+      setLicenseTestLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('license-check', {
+          body: { username, license_key: licenseKey },
+        });
+
+        if (error) {
+          toast({
+            title: 'Falha ao testar licença',
+            description: error.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const status = (data as any)?.status ?? 'unknown';
+        const expiresAt = (data as any)?.expires_at;
+        const activated = (data as any)?.activation ? ' (já ativada)' : '';
+
+        toast({
+          title: `Resultado: ${status}${activated}`,
+          description: expiresAt ? `Expira em: ${expiresAt}` : undefined,
+        });
+
+        setLicenseTestOpen(false);
+      } catch (e: any) {
+        toast({
+          title: 'Erro inesperado ao testar licença',
+          description: String(e?.message ?? e),
+          variant: 'destructive',
+        });
+      } finally {
+        setLicenseTestLoading(false);
+      }
     };
 
     const downloadBlob = React.useCallback((blob: Blob, filename: string) => {
@@ -1375,6 +1428,55 @@ export const PythonScriptPanel = React.forwardRef<HTMLDivElement, React.Componen
               SCRIPT PYTHON
             </div>
             <div className="flex gap-2">
+              <Dialog open={licenseTestOpen} onOpenChange={setLicenseTestOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                    Testar licença
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Testar licença (sem ativar)</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="license-username">Usuário</Label>
+                      <Input
+                        id="license-username"
+                        value={testUsername}
+                        onChange={(e) => setTestUsername(e.target.value)}
+                        placeholder="ex: pedro"
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="license-key">License key</Label>
+                      <Input
+                        id="license-key"
+                        value={testLicenseKey}
+                        onChange={(e) => setTestLicenseKey(e.target.value)}
+                        placeholder="ex: COC-..."
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Este teste só checa se a licença existe/está válida e se já foi ativada — não vincula HWID.
+                      </p>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setLicenseTestOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleTestLicense} disabled={licenseTestLoading}>
+                      {licenseTestLoading ? 'Testando…' : 'Testar'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <Button
                 variant="outline"
                 size="sm"
