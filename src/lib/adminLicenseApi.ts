@@ -70,7 +70,8 @@ export const adminLicenseApi = {
   createKey: async (validDays: number, note?: string) => {
     const res = await invoke<{ ok: true; key: string; record: LicenseKey }>("create_key", {
       valid_days: validDays,
-      note: note ?? null,
+      // Importante: backend valida `note` como string opcional; enviar `null` causa invalid_input.
+      note: note ?? undefined,
     });
     return res;
   },
