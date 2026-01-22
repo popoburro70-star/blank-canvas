@@ -750,6 +750,19 @@ class BotController:
                         img = Image.open(io.BytesIO(shot)).convert("RGB")
                         w, h = img.size
 
+                        # Debug opcional: salva o screenshot completo para calibrar ROI
+                        # (ajuda MUITO quando o OCR volta vazio porque o recorte não pegou o texto).
+                        debug_dir = ""
+                        ts = int(time.time() * 1000)
+                        if victory_ocr_debug:
+                            try:
+                                debug_dir = os.path.join(os.getcwd(), "debug_victory")
+                                os.makedirs(debug_dir, exist_ok=True)
+                                full_path = os.path.join(debug_dir, f"victory_full_{ts}.png")
+                                img.save(full_path)
+                            except Exception:
+                                debug_dir = ""
+
                         # Tentativas de ROI (alguns emuladores mudam muito o layout/escala)
                         roi_presets = [
                             # mais "apertado" (rápido quando encaixa)
@@ -789,6 +802,14 @@ class BotController:
                         # roda combinações (ROI preset x invert) até achar algo plausível
                         for (rx1, ry1, rx2, ry2) in roi_presets:
                             roi = img.crop((int(w * rx1), int(h * ry1), int(w * rx2), int(h * ry2)))
+
+                            if victory_ocr_debug and debug_dir:
+                                try:
+                                    roi_path = os.path.join(debug_dir, f"victory_roi_{int(rx1*100)}_{int(ry1*100)}_{int(rx2*100)}_{int(ry2*100)}_{ts}.png")
+                                    roi.save(roi_path)
+                                except Exception:
+                                    pass
+
                             for invert in (False, True):
                                 g, raw_g = _ocr_band(roi, 0.06, 0.36, invert)
                                 e, raw_e = _ocr_band(roi, 0.36, 0.66, invert)
@@ -801,6 +822,41 @@ class BotController:
                                 # early exit se já temos algo bom
                                 if s >= 5000:
                                     return best, best_raw
+
+                        # Fallback extra: se veio TUDO vazio, tenta um OCR mais permissivo no ROI mais amplo.
+                        # (sem whitelist e com outro psm) — às vezes o jogo usa fonte/anti-alias que o Otsu perde.
+                        if best_sum == 0:
+                            try:
+                                rx1, ry1, rx2, ry2 = roi_presets[-1]
+                                roi = img.crop((int(w * rx1), int(h * ry1), int(w * rx2), int(h * ry2)))
+                                arr = np.array(roi)
+                                g = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+                                g = cv2.resize(g, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+                                g = cv2.GaussianBlur(g, (3, 3), 0)
+                                # tenta limiar adaptativo (melhor quando fundo varia)
+                                t = cv2.adaptiveThreshold(g, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2)
+                                txt = pytesseract.image_to_string(t, config="--psm 6")
+                                # extrai 3 maiores números como aproximação (ouro/elixir/DE)
+                                import re
+                                vals = []
+                                for tok in re.findall(r"\d{1,3}(?:[\s\u00A0\.,]\d{3})*|\d+", txt or ""):
+                                    try:
+                                        v = int(tok.replace(" ", "").replace("\u00A0", "").replace(".", "").replace(",", ""))
+                                        if v > 0:
+                                            vals.append(v)
+                                    except Exception:
+                                        pass
+                                vals = sorted(vals, reverse=True)
+                                if len(vals) >= 1:
+                                    # como fallback, preenche do maior pro menor (não perfeito, mas melhor que 0)
+                                    best = {
+                                        "gold": int(vals[0]),
+                                        "elixir": int(vals[1]) if len(vals) >= 2 else 0,
+                                        "dark_elixir": int(vals[2]) if len(vals) >= 3 else 0,
+                                    }
+                                    best_raw = {"gold": txt or "", "elixir": txt or "", "dark_elixir": txt or ""}
+                            except Exception:
+                                pass
 
                         return best, best_raw
 
