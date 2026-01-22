@@ -97,21 +97,48 @@ export type Database = {
       }
       license_users: {
         Row: {
+          auth_user_id: string | null
           created_at: string
           enabled: boolean
           id: string
           username: string
         }
         Insert: {
+          auth_user_id?: string | null
           created_at?: string
           enabled?: boolean
           id?: string
           username: string
         }
         Update: {
+          auth_user_id?: string | null
           created_at?: string
           enabled?: boolean
           id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
           username?: string
         }
         Relationships: []
