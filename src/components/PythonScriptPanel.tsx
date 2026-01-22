@@ -80,7 +80,10 @@ ADB_DEVICE = "emulator-5554"  # Ou use "127.0.0.1:5555" para conexão TCP
  # URL do endpoint de validação (configure via variável de ambiente)
  # Exemplo: https://<backend-url>/functions/v1/validate-license
  LICENSE_VALIDATE_URL = os.environ.get("LICENSE_VALIDATE_URL", "").strip()
- LICENSE_SECRET = os.environ.get("LICENSE_SECRET", "").strip()
+ # Secret compartilhado: aceitamos dois nomes para evitar confusão.
+ # - LICENSE_SECRET (recomendado para o script)
+ # - VALIDATE_LICENSE_SHARED_SECRET (nome comum no backend)
+ LICENSE_SECRET = os.environ.get("LICENSE_SECRET", "").strip() or os.environ.get("VALIDATE_LICENSE_SHARED_SECRET", "").strip()
 
  def get_machine_fingerprint() -> str:
      """Gera um identificador estável do computador (HWID-ish).
@@ -129,8 +132,8 @@ ADB_DEVICE = "emulator-5554"  # Ou use "127.0.0.1:5555" para conexão TCP
          sys.exit(2)
 
      if not LICENSE_SECRET:
-         print("[LIC] ERRO: variável de ambiente LICENSE_SECRET não configurada.")
-         print("[LIC] Defina LICENSE_SECRET com o segredo compartilhado para autenticação.")
+         print("[LIC] ERRO: segredo não configurado.")
+         print("[LIC] Defina LICENSE_SECRET (ou VALIDATE_LICENSE_SHARED_SECRET) com o segredo compartilhado para autenticação.")
          sys.exit(2)
 
      username = input("Usuário: ").strip()
