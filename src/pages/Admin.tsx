@@ -43,6 +43,43 @@ export default function AdminPage() {
     );
   }
 
+  // Evita montar o painel (e disparar chamadas ao backend) antes do redirect acontecer.
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <Card className="border-border bg-card/80">
+            <CardHeader>
+              <CardTitle className="font-gaming">Redirecionando para login…</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <Card className="border-border bg-card/80">
+            <CardHeader>
+              <CardTitle className="font-gaming">Acesso negado</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Sua conta não tem permissão de administrador.
+              </p>
+              <Button variant="outline" asChild>
+                <Link to="/">Voltar</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10">
